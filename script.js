@@ -31,8 +31,20 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
 
+  // 파판14 한국 서버명. 닉네임 뒤에 서버명이 붙어 나오는 경우(예: 찹쌀망개떡펜리르)가 있어요.
+  const SERVER_NAMES = ['초코보', '모그리', '펜리르', '카벙클', '톤베리'];
+
+  function stripServerSuffix(name) {
+    const n = (name || '').trim();
+    // 맨 끝 세 글자가 서버명과 같을 때만 떼어내요. 앞이나 가운데에 있으면 닉네임의 일부로 봐요.
+    if (n.length > 3 && SERVER_NAMES.includes(n.slice(-3))) {
+      return n.slice(0, -3).trim();
+    }
+    return n;
+  }
+
   function normalizeNick(name) {
-    return (name || '').split('@')[0].trim();
+    return stripServerSuffix((name || '').split('@')[0].trim());
   }
 
   function resizeImageToSquare(file, size) {
@@ -242,7 +254,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   function stripDecoration(name) {
     // 닉네임 맨 앞에 붙는 파판 전용 아이콘 문자(파티 번호 등)는 한글/영문/숫자가 아니므로 제거
-    return (name || '').replace(/^[^0-9A-Za-z가-힣]+/, '').trim();
+    const cleaned = (name || '').replace(/^[^0-9A-Za-z가-힣]+/, '').trim();
+    // 닉네임 끝에 붙은 서버명(펜리르 등)도 떼어내요.
+    return stripServerSuffix(cleaned);
   }
 
   function tryParseEmote(rest) {
