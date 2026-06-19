@@ -107,7 +107,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     if (characters.length === 0) {
       const hint = document.createElement('p');
       hint.className = 'char-empty-hint';
-      hint.textContent = '아직 등록된 캐릭터가 없어요. 아래 + 버튼으로 추가해보세요.';
+      hint.textContent = '아직 등록된 캐릭터가 없습니다. 아래 + 버튼으로 추가해주세요.';
       container.appendChild(hint);
       return;
     }
@@ -162,7 +162,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
           avatarPreview.innerHTML = '<img src="' + resized + '" alt="">';
           renderPreview();
         } catch (e) {
-          alert('이미지를 처리하는 중 문제가 발생했어요. 다른 이미지로 다시 시도해주세요.');
+          alert('이미지를 처리하는 중 문제가 발생했습니다. 다른 이미지로 다시 시도해주세요.');
         }
       });
       uploadLabel.appendChild(fileInput);
@@ -245,12 +245,38 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return (name || '').replace(/^[^0-9A-Za-z가-힣]+/, '').trim();
   }
 
+  function tryParseEmote(rest) {
+    const sorted = characters
+      .map(c => ({ nick: normalizeNick(c.nickname) }))
+      .filter(c => c.nick)
+      .sort((a, b) => b.nick.length - a.nick.length);
+    for (const c of sorted) {
+      if (rest.startsWith(c.nick + '가 ') || rest.startsWith(c.nick + '이 ')) {
+        return { channelType: 'emote', channel: '감정표현', nickname: c.nick, message: rest };
+      }
+    }
+    return null;
+  }
+
   function parseRest(rest) {
-    let m = rest.match(/^\[([^\]]+)\]<([^>]+)>\s?(.*)$/);
-    if (m) return { channelType: 'bracket', channel: m[1].trim(), nickname: stripDecoration(m[2]), message: m[3] };
+    let m = rest.match(/^>>\s*([^:：]+)[:：]\s?(.*)$/);
+    if (m) return { channelType: 'whisper-out', channel: '귓속말(보냄)', nickname: stripDecoration(m[1]), message: m[2] };
+
+    m = rest.match(/^\[([^\]]+)\]<([^>]+)>\s?(.*)$/);
+    if (m) {
+      let channel = m[1].trim();
+      if (/^\d+$/.test(channel)) channel = '링크셸 ' + channel;
+      return { channelType: 'bracket', channel, nickname: stripDecoration(m[2]), message: m[3] };
+    }
+
+    m = rest.match(/^([^:：>]+)\s*>>\s*(.*)$/);
+    if (m) return { channelType: 'whisper-in', channel: '귓속말', nickname: stripDecoration(m[1]), message: m[2] };
 
     m = rest.match(/^\(([^)]+)\)\s?(.*)$/);
     if (m) return { channelType: 'party', channel: '파티', nickname: stripDecoration(m[1]), message: m[2] };
+
+    m = rest.match(/^\[([^\]]+)\]\s*(.*)$/);
+    if (m) return { channelType: 'system', channel: m[1].trim(), nickname: '', message: m[2] };
 
     m = rest.match(/^([^:：]+)[:：]\s?(.*)$/);
     if (m) return { channelType: 'say', channel: '말하기', nickname: stripDecoration(m[1]), message: m[2] };
@@ -270,6 +296,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       if (timeMatch) {
         time = timeMatch[1];
         rest = line.slice(timeMatch[0].length);
+      }
+
+      const emoteResult = tryParseEmote(rest);
+      if (emoteResult) {
+        entries.push(Object.assign({ time, raw: line }, emoteResult));
+        continue;
       }
 
       const parsed = parseRest(rest);
@@ -294,7 +326,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   let channelFilterState = {};
 
   function getFilterKey(entry) {
-    return entry.channel || '기타(인식 안 됨)';
+    return entry.channel || '시스템/기타';
   }
 
   function shouldShowChannel() {
@@ -314,7 +346,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     if (seen.length === 0) {
       const hint = document.createElement('p');
       hint.className = 'char-empty-hint';
-      hint.textContent = '로그를 변환하면 채널 목록이 여기에 나타나요.';
+      hint.textContent = '로그를 변환하면 채널 목록이 여기에 나타납니다.';
       container.appendChild(hint);
       return;
     }
@@ -367,6 +399,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const line = document.createElement('div');
       line.className = 'log-line';
 
+      const isSystem = !entry.nickname;
+
       const avatar = document.createElement('div');
       avatar.className = 'log-avatar';
       if (char) {
@@ -377,6 +411,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         } else {
           avatar.textContent = char.avatarValue || '＃';
         }
+      } else if (isSystem) {
+        avatar.classList.add('log-avatar-default');
+        avatar.textContent = entry.channel ? entry.channel.charAt(0) : '!';
       } else {
         avatar.classList.add('log-avatar-default');
         avatar.textContent = (entry.nickname || '?').charAt(0) || '?';
@@ -393,10 +430,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
       const nameSpan = document.createElement('span');
       nameSpan.className = 'log-name';
-      nameSpan.textContent = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
+      nameSpan.textContent = isSystem ? (entry.channel || '시스템') : ((char && char.displayName) ? char.displayName : (entry.nickname || '???'));
       meta.appendChild(nameSpan);
 
-      if (entry.channel && shouldShowChannel()) {
+      if (entry.channel && shouldShowChannel() && !isSystem) {
         const chSpan = document.createElement('span');
         chSpan.className = 'log-channel';
         chSpan.textContent = '[' + entry.channel + ']';
@@ -420,7 +457,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     });
 
     if (filtered.length === 0) {
-      preview.innerHTML = '<p class="empty-notice">표시할 로그가 없어요. 로그를 붙여넣고, 닉네임을 등록했는지 확인해보세요.</p>';
+      preview.innerHTML = '<p class="empty-notice">표시할 로그가 없습니다. 로그를 붙여넣고, 닉네임을 등록했는지 확인해주세요.</p>';
     }
   }
 
@@ -429,11 +466,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   function exportImage() {
     const node = document.getElementById('preview');
     if (!node.children.length || node.querySelector('.empty-notice')) {
-      alert('내보낼 로그가 없어요. 먼저 변환하기를 눌러주세요.');
+      alert('내보낼 로그가 없습니다. 먼저 변환하기를 눌러주세요.');
       return;
     }
     if (typeof html2canvas === 'undefined') {
-      alert('이미지 저장 기능을 불러오지 못했어요. 인터넷 연결을 확인해주세요.');
+      alert('이미지 저장 기능을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.');
       return;
     }
     html2canvas(node, { backgroundColor: '#161b23', scale: 2 }).then(canvas => {
@@ -442,7 +479,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       link.href = canvas.toDataURL('image/png');
       link.click();
     }).catch(err => {
-      alert('이미지 저장 중 문제가 발생했어요: ' + err.message);
+      alert('이미지 저장 중 문제가 발생했습니다: ' + err.message);
     });
   }
 
@@ -454,17 +491,18 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   function buildLineHtml(entry) {
     const char = findCharacterByNickname(entry.nickname);
+    const isSystem = !entry.nickname;
     const bg = char ? char.bg : '#242c39';
     const color = char ? char.color : '#e9e4d6';
-    const displayName = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
-    const channelLabel = (entry.channel && shouldShowChannel()) ? '[' + entry.channel + ']' : '';
+    const displayName = isSystem ? (entry.channel || '시스템') : ((char && char.displayName) ? char.displayName : (entry.nickname || '???'));
+    const channelLabel = (entry.channel && shouldShowChannel() && !isSystem) ? '[' + entry.channel + ']' : '';
     const timeLabel = entry.time ? entry.time : '';
 
     let avatarHtml;
     if (char && char.avatarType === 'image' && char.avatarValue) {
       avatarHtml = '<img src="' + char.avatarValue + '" width="22" height="22" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">';
     } else {
-      const emoji = char ? (char.avatarValue || '＃') : ((entry.nickname || '?').charAt(0) || '?');
+      const emoji = char ? (char.avatarValue || '＃') : (isSystem ? (entry.channel ? entry.channel.charAt(0) : '!') : ((entry.nickname || '?').charAt(0) || '?'));
       const avatarBg = char ? char.bg : '#242c39';
       const avatarColor = char ? char.color : '#8b93a3';
       avatarHtml = '<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:' + avatarBg + ';color:' + avatarColor + ';font-size:12px;vertical-align:middle;margin-right:6px;">' + escapeHtml(emoji) + '</span>';
@@ -486,9 +524,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   function buildPlainText(entry) {
     const char = findCharacterByNickname(entry.nickname);
-    const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
+    const isSystem = !entry.nickname;
+    const name = isSystem ? (entry.channel || '시스템') : ((char && char.displayName) ? char.displayName : (entry.nickname || '???'));
     const timeLabel = entry.time ? '[' + entry.time + '] ' : '';
-    const channelLabel = (entry.channel && shouldShowChannel()) ? '[' + entry.channel + '] ' : '';
+    const channelLabel = (entry.channel && shouldShowChannel() && !isSystem) ? '[' + entry.channel + '] ' : '';
     return timeLabel + channelLabel + name + ': ' + entry.message;
   }
 
@@ -503,7 +542,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const text = document.getElementById('logInput').value;
     const filtered = getFilteredEntries(text);
     if (filtered.length === 0) {
-      alert('복사할 로그가 없어요. 먼저 변환하기를 눌러주세요.');
+      alert('복사할 로그가 없습니다. 먼저 변환하기를 눌러주세요.');
       return;
     }
 
@@ -551,7 +590,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     document.body.removeChild(temp);
     flashCopyButton('copyBtn', success);
     if (!success) {
-      alert('클립보드 복사에 실패했어요. 사용 중인 브라우저에서 지원하지 않을 수 있어요.');
+      alert('클립보드 복사에 실패했습니다. 사용 중인 브라우저에서 지원하지 않을 수 있습니다.');
     }
   }
 
@@ -559,7 +598,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const text = document.getElementById('logInput').value;
     const filtered = getFilteredEntries(text);
     if (filtered.length === 0) {
-      alert('복사할 로그가 없어요. 먼저 변환하기를 눌러주세요.');
+      alert('복사할 로그가 없습니다. 먼저 변환하기를 눌러주세요.');
       return;
     }
 
@@ -594,7 +633,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     document.body.removeChild(temp);
     flashCopyButton('textCopyBtn', success);
     if (!success) {
-      alert('클립보드 복사에 실패했어요. 사용 중인 브라우저에서 지원하지 않을 수 있어요.');
+      alert('클립보드 복사에 실패했습니다. 사용 중인 브라우저에서 지원하지 않을 수 있습니다.');
     }
   }
 
@@ -614,7 +653,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   });
 
   document.getElementById('resetBtn').addEventListener('click', () => {
-    if (confirm('등록된 모든 캐릭터 설정을 삭제할까요? 되돌릴 수 없어요.')) {
+    if (confirm('등록된 모든 캐릭터 설정을 삭제할까요? 되돌릴 수 없습니다.')) {
       characters = [];
       saveCharacters();
       renderCharList();

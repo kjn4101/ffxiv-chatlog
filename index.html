@@ -8,52 +8,41 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-
 </head>
 <body>
-
   <header class="app-header">
     <div class="crest"></div>
     <div>
       <h1>FF14 로그</h1>
-      <p class="subtitle">파이널판타지14 채팅 로그를 캐릭터별로 꾸며서 정리하는 도구</p>
+      <p class="subtitle">FFXIV 채팅 로그를 캐릭터별로 정리합니다.</p>
     </div>
   </header>
-
   <div class="layout">
-
     <aside class="panel">
       <h2>닉네임 설정</h2>
       <div id="charList"></div>
       <button id="addCharBtn" class="btn btn-ghost" type="button">+ 캐릭터 추가</button>
-
       <div class="filter-row">
         <label class="switch-label">
           <input type="checkbox" id="filterToggle" checked>
           등록된 닉네임만 표시
         </label>
-
         <label class="switch-label" style="margin-top: 10px;">
           <input type="checkbox" id="showChannelToggle" checked>
           [자유부대]/[파티] 같은 채널 이름 표시
         </label>
-
-        <div class="channel-filter-heading">채널 필터 (체크한 채널만 보여줘요)</div>
+        <div class="channel-filter-heading">채널 필터 (체크한 채널만 표시됩니다)</div>
         <div id="channelFilterList" class="channel-filter-group">
-          <p class="char-empty-hint">로그를 변환하면 채널 목록이 여기에 나타나요.</p>
+          <p class="char-empty-hint">로그 변환을 시도하면 채널 목록이 하단에 나타납니다.</p>
         </div>
       </div>
-
       <button id="resetBtn" class="reset-link" type="button">전체 초기화</button>
     </aside>
-
     <section class="panel">
       <h2>로그 입력</h2>
-      <p class="hint-text">파판14 채팅창에서 복사한 로그를 그대로 붙여넣으세요. 줄바꿈된 메시지도 자동으로 이어서 인식하고, 파티 번호 아이콘처럼 닉네임 앞에 붙는 특수문자도 자동으로 떼어내요. 시간 표시가 꺼져 있어서 맨 앞에 [HH:MM]이 없어도 채널/닉네임은 그대로 인식해요.<br>
-      현재 인식 가능한 형식: <code>[채널]&lt;닉네임&gt; 메시지</code> (자유부대/링크셀 등), <code>(닉네임) 메시지</code> (파티), <code>닉네임: 메시지</code> (일반 채팅). 다른 형식이 안 맞으면 알려주세요.</p>
-
+      <p class="hint-text">FF14 채팅 로그를 복사하여 붙여넣으세요. 파티 번호 아이콘 등 닉네임 앞에 붙는 특수문자는 자동으로 떼어냅니다.<br>
+      현재 인식 가능한 형식: <br><code>[채널]&lt;닉네임&gt; 메시지</code> (자유부대/링크셸/서초링 등), <br><code>(닉네임) 메시지</code> (파티), <br><code>닉네임: 메시지</code> (일반 채팅), <br><code>&gt;&gt;닉네임: 메시지</code> / <code>닉네임 &gt;&gt; 메시지</code> (귓속말), <br><code>[이벤트] 메시지</code> (시스템 공지), <br><code>닉네임이/가 ~합니다</code> (감정표현, 닉네임 등록 필요). <br>인식하지 못하는 형식이 있을 시 문의 바랍니다.</p>
       <textarea id="logInput" placeholder="여기에 채팅 로그를 붙여넣으세요"></textarea>
-
       <div class="actions">
         <button id="renderBtn" class="btn btn-primary" type="button">변환하기</button>
         <button id="copyBtn" class="btn btn-cyan-outline" type="button">서식 복사하기</button>
@@ -61,21 +50,17 @@
         <button id="exportBtn" class="btn btn-gold" type="button">이미지로 저장</button>
         <button id="clearBtn" class="btn btn-outline" type="button">지우기</button>
       </div>
-      <p class="export-note">* 서식 복사하기는 색/아바타가 살아있는 채로 복사돼서 카페 글쓰기 창, 워드, 메일처럼 서식을 지원하는 곳에 어울리고, 텍스트만 복사는 디스코드나 메모장처럼 서식이 필요 없는 곳에 어울려요. 둘 다 인터넷 연결 없이 동작해요. 이미지로 저장만 처음 사용할 때 인터넷 연결이 필요해요.</p>
-
+      <p class="export-note">* 서식 복사하기는 색상과 아바타가 유지된 채로 복사되어, 카페 글쓰기 창이나 워드, 메일처럼 서식을 지원하는 곳에 적합합니다. 텍스트만 복사는 디스코드나 메모장처럼 서식이 필요 없는 곳에 적합합니다. 두 기능 모두 인터넷 연결 없이 동작합니다. 이미지로 저장 기능만 처음 사용 시 인터넷 연결이 필요합니다.</p>
       <div class="preview-frame">
         <div class="preview-frame-corner tl"></div>
         <div class="preview-frame-corner tr"></div>
         <div class="preview-frame-corner bl"></div>
         <div class="preview-frame-corner br"></div>
-        <div id="preview"><p class="empty-notice">로그를 붙여넣고 변환하기를 눌러보세요.</p></div>
+        <div id="preview"><p class="empty-notice">로그를 붙여넣고 변환하기를 눌러주세요.</p></div>
       </div>
     </section>
-
   </div>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="script.js"></script>
-
 </body>
 </html>
