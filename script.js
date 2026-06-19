@@ -518,6 +518,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return document.getElementById('showChannelToggle').checked;
   }
 
+  function shouldShowTime() {
+    return document.getElementById('showTimeToggle').checked;
+  }
+
   function renderChannelFilter(entries) {
     const container = document.getElementById('channelFilterList');
     const seen = [];
@@ -607,7 +611,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     msg.innerHTML = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
     inner.appendChild(msg);
 
-    if (entry.time) {
+    if (entry.time && shouldShowTime()) {
       const t = document.createElement('span');
       t.className = 'log-emote-time';
       t.textContent = entry.time;
@@ -668,7 +672,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const timeSpan = document.createElement('span');
     timeSpan.className = 'log-time';
     timeSpan.textContent = entry.time;
-    if (entry.time) meta.appendChild(timeSpan);
+    if (entry.time && shouldShowTime()) meta.appendChild(timeSpan);
 
     bubble.appendChild(meta);
 
@@ -690,7 +694,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const inner = document.createElement('div');
     inner.className = 'log-system';
 
-    if (entry.time) {
+    if (entry.time && shouldShowTime()) {
       const t = document.createElement('span');
       t.className = 'log-system-time';
       t.textContent = entry.time;
@@ -778,7 +782,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const timeSpan = document.createElement('span');
       timeSpan.className = 'log-time';
       timeSpan.textContent = entry.time;
-      if (entry.time) meta.appendChild(timeSpan);
+      if (entry.time && shouldShowTime()) meta.appendChild(timeSpan);
 
       bubble.appendChild(meta);
 
@@ -840,7 +844,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const isWhisper = entry.channelType === 'whisper-out' || entry.channelType === 'whisper-in';
     const isSystem = !entry.nickname && !isWhisper;
     const messageHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
-    const timeLabel = entry.time ? entry.time : '';
+    const timeLabel = (entry.time && shouldShowTime()) ? entry.time : '';
 
     // 귓속말: 반투명 이탤릭. 보낸 건 왼쪽(내 캐릭터), 받은 건 오른쪽 정렬.
     if (isWhisper) {
@@ -920,7 +924,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const char = findCharacterByNickname(entry.nickname);
     const isEmote = entry.channelType === 'emote';
     const isSystem = !entry.nickname && entry.channelType !== 'whisper-out';
-    const timeLabel = entry.time ? '[' + entry.time + '] ' : '';
+    const timeLabel = (entry.time && shouldShowTime()) ? '[' + entry.time + '] ' : '';
 
     if (entry.channelType === 'whisper-out') {
       return timeLabel + myDisplayName() + ' → ' + nickToDisplay(entry.recipient) + ' (귓속말): ' + entry.message;
@@ -1054,6 +1058,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   document.getElementById('renderBtn').addEventListener('click', renderPreview);
   document.getElementById('filterToggle').addEventListener('change', renderPreview);
   document.getElementById('showChannelToggle').addEventListener('change', renderPreview);
+  document.getElementById('showTimeToggle').addEventListener('change', renderPreview);
   document.getElementById('copyBtn').addEventListener('click', copyFormatted);
   document.getElementById('textCopyBtn').addEventListener('click', copyPlainText);
   document.getElementById('exportBtn').addEventListener('click', exportImage);
