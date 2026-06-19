@@ -1,93 +1,152 @@
 :root {
-    --void: #0d1117;
-    --panel: #1b212c;
-    --panel-raised: #242c39;
-    --border-soft: #313b4b;
-    --gold: #c9a86a;
-    --cyan: #6fb3c9;
-    --text-primary: #e9e4d6;
-    --text-secondary: #8b93a3;
-    --danger: #c96a6a;
+    /* 에오르제아의 밤하늘 — 깊은 남보라에 황금빛 장식과 크리스탈(에테르) 청록을 더했어요. */
+    --void: #0b0e16;
+    --panel: #161c28;
+    --panel-raised: #1f2735;
+    --border-soft: #2c3648;
+    --border-glow: rgba(201, 168, 106, 0.22);
+    --gold: #d4af72;
+    --gold-deep: #a8843f;
+    --cyan: #74c0d4;
+    --aether: #8fd3e0;
+    --text-primary: #ece6d6;
+    --text-secondary: #8a93a6;
+    --danger: #d07a7a;
+    --radius: 12px;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
 
   body {
-    background: radial-gradient(circle at 18% -8%, #1c2433 0%, #0d1117 55%, #090b0f 100%);
+    background:
+      radial-gradient(circle at 15% -10%, rgba(116, 192, 212, 0.10) 0%, transparent 42%),
+      radial-gradient(circle at 88% 4%, rgba(212, 175, 114, 0.10) 0%, transparent 40%),
+      radial-gradient(circle at 50% 120%, #141b2b 0%, var(--void) 60%);
+    background-color: var(--void);
     color: var(--text-primary);
     font-family: 'Noto Sans KR', sans-serif;
     min-height: 100vh;
-    padding: 32px 20px 64px;
+    padding: 40px 20px 72px;
+    -webkit-font-smoothing: antialiased;
   }
 
+  /* ---------- 헤더 (시그니처 요소) ---------- */
   .app-header {
     max-width: 1180px;
-    margin: 0 auto 28px;
+    margin: 0 auto 30px;
     display: flex;
     align-items: center;
-    gap: 16px;
+    gap: 18px;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--border-soft);
+    position: relative;
+  }
+
+  /* 헤더 아래 황금 실선 — 가운데에서 양쪽으로 옅어지는 장식선 */
+  .app-header::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    height: 1px;
+    width: 220px;
+    background: linear-gradient(90deg, var(--gold) 0%, transparent 100%);
   }
 
   .crest {
-    width: 34px;
-    height: 34px;
+    width: 40px;
+    height: 40px;
     flex-shrink: 0;
-    background: linear-gradient(135deg, var(--gold), var(--cyan));
+    background: linear-gradient(135deg, var(--gold) 0%, var(--gold-deep) 45%, var(--cyan) 100%);
     transform: rotate(45deg);
-    border-radius: 4px;
-    box-shadow: 0 0 18px rgba(201, 168, 106, 0.45);
+    border-radius: 6px;
+    position: relative;
+    box-shadow:
+      0 0 22px rgba(212, 175, 114, 0.4),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+  }
+
+  /* 크리스탈 내부의 빛나는 작은 심 */
+  .crest::after {
+    content: '';
+    position: absolute;
+    inset: 11px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.55);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
   }
 
   .app-header h1 {
     font-family: 'Gowun Batang', serif;
-    font-size: 26px;
-    margin: 0 0 4px;
-    letter-spacing: 0.5px;
-    color: var(--gold);
+    font-size: 28px;
+    margin: 0 0 5px;
+    letter-spacing: 1.5px;
+    background: linear-gradient(100deg, var(--gold) 20%, #f0dcae 50%, var(--gold) 80%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
 
   .app-header .subtitle {
     margin: 0;
     font-size: 13px;
     color: var(--text-secondary);
+    letter-spacing: 0.3px;
   }
 
+  /* ---------- 레이아웃 ---------- */
   .layout {
     max-width: 1180px;
     margin: 0 auto;
     display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 22px;
+    grid-template-columns: 330px 1fr;
+    gap: 24px;
+    align-items: start;
   }
 
   @media (max-width: 860px) {
     .layout { grid-template-columns: 1fr; }
+    body { padding: 28px 14px 56px; }
   }
 
   .panel {
-    background: var(--panel);
+    background: linear-gradient(180deg, var(--panel) 0%, #131825 100%);
     border: 1px solid var(--border-soft);
-    border-radius: 10px;
-    padding: 20px;
+    border-radius: var(--radius);
+    padding: 22px;
+    position: relative;
+  }
+
+  /* 패널 상단의 가느다란 황금 강조선 */
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 22px;
+    right: 22px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-glow) 30%, var(--border-glow) 70%, transparent);
   }
 
   .panel h2 {
     font-family: 'Gowun Batang', serif;
-    font-size: 16px;
-    margin: 0 0 14px;
-    color: var(--text-primary);
+    font-size: 17px;
+    margin: 0 0 16px;
+    color: var(--gold);
     border-bottom: 1px solid var(--border-soft);
-    padding-bottom: 10px;
+    padding-bottom: 12px;
+    letter-spacing: 0.5px;
   }
 
-  /* 캐릭터 설정 패널 */
+  /* ---------- 캐릭터 설정 패널 ---------- */
   .char-empty-hint {
     color: var(--text-secondary);
     font-size: 13px;
     text-align: center;
     padding: 18px 6px;
-    line-height: 1.6;
+    line-height: 1.7;
   }
 
   .char-row {
@@ -97,22 +156,25 @@
     align-items: flex-start;
     background: var(--panel-raised);
     border: 1px solid var(--border-soft);
-    border-radius: 8px;
-    padding: 12px;
+    border-radius: 10px;
+    padding: 13px;
     margin-bottom: 10px;
+    transition: border-color 0.2s var(--ease);
   }
+
+  .char-row:hover { border-color: var(--border-glow); }
 
   .avatar-edit {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     width: 56px;
   }
 
   .avatar-preview {
-    width: 40px;
-    height: 40px;
+    width: 42px;
+    height: 42px;
     border-radius: 50%;
     background: var(--panel);
     border: 1px solid var(--border-soft);
@@ -121,6 +183,7 @@
     justify-content: center;
     font-size: 18px;
     overflow: hidden;
+    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.2);
   }
 
   .avatar-preview img {
@@ -133,10 +196,10 @@
     width: 48px;
     text-align: center;
     font-size: 12px;
-    padding: 3px 2px;
+    padding: 4px 2px;
     background: var(--panel);
     border: 1px solid var(--border-soft);
-    border-radius: 4px;
+    border-radius: 5px;
     color: var(--text-primary);
   }
 
@@ -144,26 +207,31 @@
     font-size: 11px;
     color: var(--cyan);
     cursor: pointer;
-    text-decoration: underline;
+    text-decoration: none;
+    border-bottom: 1px dotted currentColor;
+    transition: color 0.2s var(--ease);
   }
+
+  .upload-btn:hover { color: var(--aether); }
 
   .char-fields {
     flex: 1;
     min-width: 150px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 7px;
   }
 
   .char-fields input[type="text"] {
     width: 100%;
     background: var(--panel);
     border: 1px solid var(--border-soft);
-    border-radius: 4px;
-    padding: 7px 9px;
+    border-radius: 5px;
+    padding: 8px 10px;
     color: var(--text-primary);
     font-family: inherit;
     font-size: 13px;
+    transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
   }
 
   .char-fields input[type="text"]::placeholder {
@@ -174,23 +242,23 @@
     display: flex;
     gap: 14px;
     align-items: center;
-    margin-top: 2px;
+    margin-top: 3px;
   }
 
   .color-row label {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
     font-size: 12px;
     color: var(--text-secondary);
   }
 
   .color-row input[type="color"] {
-    width: 28px;
-    height: 22px;
+    width: 30px;
+    height: 24px;
     padding: 0;
     border: 1px solid var(--border-soft);
-    border-radius: 4px;
+    border-radius: 5px;
     background: none;
     cursor: pointer;
   }
@@ -199,30 +267,52 @@
     background: transparent;
     border: 1px solid var(--border-soft);
     color: var(--danger);
-    width: 26px;
-    height: 26px;
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
     cursor: pointer;
     font-size: 13px;
     line-height: 1;
     flex-shrink: 0;
+    transition: background 0.2s var(--ease), border-color 0.2s var(--ease);
   }
 
-  .remove-btn:hover { background: rgba(201, 106, 106, 0.15); }
+  .remove-btn:hover { background: rgba(208, 122, 122, 0.16); border-color: var(--danger); }
 
+  /* ---------- 공통 입력 포커스 ---------- */
+  input:focus-visible,
+  textarea:focus-visible {
+    outline: none;
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 3px rgba(116, 192, 212, 0.18);
+  }
+
+  button:focus-visible,
+  .upload-btn:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: 2px;
+  }
+
+  /* ---------- 버튼 ---------- */
   .btn {
-    padding: 10px 16px;
-    border-radius: 6px;
+    padding: 10px 17px;
+    border-radius: 7px;
     border: 1px solid transparent;
     font-weight: 600;
     font-size: 13px;
     cursor: pointer;
     font-family: inherit;
+    letter-spacing: 0.2px;
+    transition: filter 0.18s var(--ease), background 0.18s var(--ease),
+                border-color 0.18s var(--ease), color 0.18s var(--ease),
+                transform 0.06s var(--ease);
   }
+
+  .btn:active { transform: translateY(1px); }
 
   .btn-ghost {
     background: transparent;
-    border: 1px solid var(--border-soft);
+    border: 1px dashed var(--border-soft);
     color: var(--text-secondary);
     width: 100%;
     margin-top: 4px;
@@ -231,8 +321,8 @@
   .btn-ghost:hover { border-color: var(--cyan); color: var(--cyan); }
 
   .filter-row {
-    margin-top: 18px;
-    padding-top: 14px;
+    margin-top: 20px;
+    padding-top: 16px;
     border-top: 1px solid var(--border-soft);
   }
 
@@ -243,13 +333,14 @@
     font-size: 13px;
     color: var(--text-secondary);
     cursor: pointer;
+    line-height: 1.4;
   }
 
-  .switch-label input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--cyan); }
+  .switch-label input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--cyan); flex-shrink: 0; }
 
   .reset-link {
     display: inline-block;
-    margin-top: 12px;
+    margin-top: 14px;
     background: none;
     border: none;
     color: var(--text-secondary);
@@ -257,13 +348,14 @@
     text-decoration: underline;
     cursor: pointer;
     padding: 0;
+    transition: color 0.2s var(--ease);
   }
 
   .reset-link:hover { color: var(--danger); }
 
   .channel-filter-heading {
-    margin-top: 14px;
-    margin-bottom: 8px;
+    margin-top: 16px;
+    margin-bottom: 9px;
     font-size: 12px;
     color: var(--text-secondary);
     letter-spacing: 0.3px;
@@ -272,7 +364,7 @@
   .channel-filter-group {
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    gap: 8px;
   }
 
   .channel-check {
@@ -286,40 +378,58 @@
 
   .channel-check input { width: 15px; height: 15px; cursor: pointer; accent-color: var(--gold); }
 
-  /* 메인 패널 */
+  /* ---------- 메인 패널 ---------- */
   .hint-text {
     font-size: 12px;
     color: var(--text-secondary);
-    margin: -6px 0 10px;
-    line-height: 1.5;
+    margin: -4px 0 12px;
+    line-height: 1.7;
+  }
+
+  .hint-text code {
+    background: var(--panel-raised);
+    border: 1px solid var(--border-soft);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 11.5px;
+    color: var(--aether);
   }
 
   textarea#logInput {
     width: 100%;
-    min-height: 150px;
+    min-height: 160px;
     background: var(--panel-raised);
     border: 1px solid var(--border-soft);
-    border-radius: 6px;
-    padding: 12px;
+    border-radius: 8px;
+    padding: 13px;
     color: var(--text-primary);
     font-family: inherit;
     font-size: 13px;
+    line-height: 1.6;
     resize: vertical;
   }
 
   .actions {
     display: flex;
     gap: 10px;
-    margin-top: 12px;
+    margin-top: 14px;
     flex-wrap: wrap;
     align-items: center;
   }
 
-  .btn-primary { background: var(--cyan); color: #0c1118; }
+  .btn-primary {
+    background: linear-gradient(180deg, var(--aether), var(--cyan));
+    color: #0a1016;
+    box-shadow: 0 1px 12px rgba(116, 192, 212, 0.25);
+  }
   .btn-primary:hover { filter: brightness(1.08); }
 
-  .btn-gold { background: var(--gold); color: #1c1407; }
-  .btn-gold:hover { filter: brightness(1.08); }
+  .btn-gold {
+    background: linear-gradient(180deg, #e2c184, var(--gold));
+    color: #1c1407;
+    box-shadow: 0 1px 12px rgba(212, 175, 114, 0.25);
+  }
+  .btn-gold:hover { filter: brightness(1.06); }
 
   .btn-outline {
     background: transparent;
@@ -333,59 +443,68 @@
     border: 1px solid var(--cyan);
     color: var(--cyan);
   }
-  .btn-cyan-outline:hover { background: rgba(111, 179, 201, 0.12); }
+  .btn-cyan-outline:hover { background: rgba(116, 192, 212, 0.12); }
 
   .export-note {
     font-size: 11px;
     color: var(--text-secondary);
-    margin-top: 6px;
+    margin-top: 8px;
+    line-height: 1.6;
   }
 
+  /* ---------- 미리보기 ---------- */
   .preview-frame {
     position: relative;
-    border: 1px solid rgba(201, 168, 106, 0.35);
-    border-radius: 10px;
-    padding: 20px;
-    margin-top: 20px;
-    background: linear-gradient(160deg, #1a2029, #161b23);
+    border: 1px solid var(--border-glow);
+    border-radius: var(--radius);
+    padding: 22px;
+    margin-top: 22px;
+    background: linear-gradient(160deg, #1a2130 0%, #12161f 100%);
+    box-shadow: inset 0 1px 30px rgba(0, 0, 0, 0.3);
   }
 
   .preview-frame-corner {
     position: absolute;
-    width: 14px;
-    height: 14px;
+    width: 15px;
+    height: 15px;
     pointer-events: none;
   }
-  .preview-frame-corner.tl { top: -1px; left: -1px; border-top: 2px solid var(--gold); border-left: 2px solid var(--gold); }
-  .preview-frame-corner.tr { top: -1px; right: -1px; border-top: 2px solid var(--gold); border-right: 2px solid var(--gold); }
-  .preview-frame-corner.bl { bottom: -1px; left: -1px; border-bottom: 2px solid var(--gold); border-left: 2px solid var(--gold); }
-  .preview-frame-corner.br { bottom: -1px; right: -1px; border-bottom: 2px solid var(--gold); border-right: 2px solid var(--gold); }
+  .preview-frame-corner.tl { top: -1px; left: -1px; border-top: 2px solid var(--gold); border-left: 2px solid var(--gold); border-top-left-radius: var(--radius); }
+  .preview-frame-corner.tr { top: -1px; right: -1px; border-top: 2px solid var(--gold); border-right: 2px solid var(--gold); border-top-right-radius: var(--radius); }
+  .preview-frame-corner.bl { bottom: -1px; left: -1px; border-bottom: 2px solid var(--gold); border-left: 2px solid var(--gold); border-bottom-left-radius: var(--radius); }
+  .preview-frame-corner.br { bottom: -1px; right: -1px; border-bottom: 2px solid var(--gold); border-right: 2px solid var(--gold); border-bottom-right-radius: var(--radius); }
 
   #preview {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 13px;
     max-height: 520px;
     overflow-y: auto;
-    padding-right: 6px;
+    padding-right: 8px;
   }
+
+  #preview::-webkit-scrollbar { width: 8px; }
+  #preview::-webkit-scrollbar-track { background: transparent; }
+  #preview::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 4px; }
+  #preview::-webkit-scrollbar-thumb:hover { background: var(--gold-deep); }
 
   .empty-notice {
     color: var(--text-secondary);
     font-size: 13px;
     text-align: center;
-    padding: 30px 10px;
+    padding: 38px 10px;
+    line-height: 1.7;
   }
 
   .log-line {
     display: flex;
-    gap: 10px;
+    gap: 11px;
     align-items: flex-start;
   }
 
   .log-avatar {
-    width: 34px;
-    height: 34px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     flex-shrink: 0;
     display: flex;
@@ -394,6 +513,7 @@
     font-size: 16px;
     overflow: hidden;
     background: var(--panel-raised);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
   }
 
   .log-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -402,13 +522,16 @@
     color: var(--text-secondary);
     font-weight: 700;
     border: 1px dashed var(--border-soft);
+    box-shadow: none;
   }
 
   .log-bubble {
     flex: 1;
-    border-radius: 8px;
-    padding: 9px 12px;
+    min-width: 0;
+    border-radius: 10px;
+    padding: 10px 13px;
     background: var(--panel-raised);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.22);
   }
 
   .log-meta {
@@ -416,7 +539,7 @@
     align-items: baseline;
     gap: 8px;
     flex-wrap: wrap;
-    margin-bottom: 3px;
+    margin-bottom: 4px;
   }
 
   .log-name {
@@ -438,6 +561,51 @@
 
   .log-message {
     font-size: 14px;
-    line-height: 1.55;
+    line-height: 1.6;
     word-break: break-word;
+  }
+
+  /* 시스템/공지 메시지 — 가운데 정렬된 조용한 한 줄로 구분 */
+  .log-line.is-system {
+    justify-content: center;
+  }
+
+  .log-line.is-system .log-avatar { display: none; }
+
+  .log-line.is-system .log-bubble {
+    flex: 0 1 auto;
+    background: transparent;
+    box-shadow: none;
+    text-align: center;
+    padding: 4px 12px;
+    color: var(--text-secondary);
+  }
+
+  .log-line.is-system .log-meta {
+    justify-content: center;
+    margin-bottom: 2px;
+  }
+
+  .log-line.is-system .log-name {
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.4px;
+    color: var(--gold-deep);
+    text-transform: none;
+  }
+
+  .log-line.is-system .log-time { margin-left: 8px; }
+
+  .log-line.is-system .log-message {
+    font-size: 12.5px;
+    opacity: 0.85;
+  }
+
+  /* ---------- 모션 최소화 선호 존중 ---------- */
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+      animation: none !important;
+    }
   }

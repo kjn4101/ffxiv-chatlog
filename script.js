@@ -414,6 +414,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       line.className = 'log-line';
 
       const isSystem = !entry.nickname;
+      if (isSystem) line.classList.add('is-system');
 
       const avatar = document.createElement('div');
       avatar.className = 'log-avatar';
@@ -487,7 +488,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       alert('이미지 저장 기능을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.');
       return;
     }
-    html2canvas(node, { backgroundColor: '#161b23', scale: 2 }).then(canvas => {
+    html2canvas(node, { backgroundColor: '#161d28', scale: 2 }).then(canvas => {
       const link = document.createElement('a');
       link.download = 'ffxiv_log_' + Date.now() + '.png';
       link.href = canvas.toDataURL('image/png');
