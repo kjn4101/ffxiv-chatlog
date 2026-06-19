@@ -862,19 +862,29 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   }
 
   /* ---------- 서식 복사 (클립보드) ---------- */
-  /* 미리보기는 CSS 클래스를 쓰지만, 클립보드에 복사할 때는 외부 프로그램에서도
-     색/배치가 살아있도록 모든 스타일을 인라인으로 다시 만들어요.
-     표(table)나 float는 카페/블로그 에디터에 붙여넣을 때 깨지기 쉬워서,
-     아바타를 이름 앞에 붙는 작은 인라인 아이콘으로 두는 단순한 구조를 써요. */
+  /* 미리보기는 CSS 클래스를 쓰지만, 클립보드에 복사할 때는 외부 프로그램(구글 문서·워드 등)에서도
+     색/배치가 살아남도록 표(table) 기반 인라인 스타일로 다시 만들어요. */
 
-  function inlineAvatarHtml(char, fallback) {
+  /* 구글 문서·워드 등은 div의 배경/둥근모서리/패딩을 거의 버리지만, 표(table) 셀의 배경색과
+     구조는 비교적 잘 보존해요. 그래서 서식 복사는 메시지마다 표 한 개(아바타 칸 + 내용 칸)로
+     포장합니다. 표 사이에는 에디터가 자동으로 간격을 넣어줘서 카드처럼 분리돼 보여요. */
+  const COPY_FONT = "font-family:'Malgun Gothic','Noto Sans KR',sans-serif;";
+
+  function tableAvatarHtml(char, fallback) {
+    // 표 셀 안에 넣을 아바타 (이미지 또는 이모지). 셀 배경/글씨색은 호출부에서 지정해요.
     if (char && char.avatarType === 'image' && char.avatarValue) {
-      return '<img src="' + char.avatarValue + '" width="22" height="22" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin:0 6px;">';
+      return '<img src="' + char.avatarValue + '" width="26" height="26" style="width:26px;height:26px;border-radius:50%;object-fit:cover;display:inline-block;">';
     }
-    const emoji = char ? (char.avatarValue || '') : (fallback || '?');
-    const avatarBg = char ? char.bg : '#242c39';
-    const avatarColor = char ? char.color : '#8b93a3';
-    return '<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:' + avatarBg + ';color:' + avatarColor + ';font-size:12px;vertical-align:middle;margin:0 6px;">' + escapeHtml(emoji) + '</span>';
+    return escapeHtml(char ? (char.avatarValue || '') : (fallback || ''));
+  }
+
+  function cardTableHtml(bg, color, avInner, headerHtml, bodyHtml, italic) {
+    return '<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:none;width:100%;margin:0 0 6px 0;' + COPY_FONT + '"><tr>' +
+      '<td width="38" valign="top" style="width:38px;padding:8px 4px;background:' + bg + ';color:' + color + ';text-align:center;font-size:16px;border:none;">' + avInner + '</td>' +
+      '<td valign="top" style="padding:8px 12px;background:' + bg + ';color:' + color + ';font-size:14px;line-height:1.55;border:none;">' +
+        headerHtml + '<br>' +
+        '<span style="' + (italic ? 'font-style:italic;' : '') + '">' + bodyHtml + '</span>' +
+      '</td></tr></table>';
   }
 
   function buildLineHtml(entry) {
@@ -885,49 +895,44 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const messageHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
     const timeLabel = (entry.time && shouldShowTime()) ? entry.time : '';
 
-    // 귓속말: 반투명 이탤릭. 보낸 건 왼쪽(내 캐릭터), 받은 건 오른쪽 정렬.
+    // 귓속말: 이탤릭으로 사적인 느낌. 보낸/받은 모두 "보낸사람 → 받은사람".
     if (isWhisper) {
       const isOut = entry.channelType === 'whisper-out';
       const wChar = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
-      const bg = wChar ? hexToRgba(wChar.bg, 0.72) : 'rgba(36, 44, 57, 0.72)';
+      const bg = wChar ? wChar.bg : '#242c39';
       const color = wChar ? wChar.color : '#e9e4d6';
       const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
       const tag = '→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName());
-      // 아바타도 말풍선과 같은 투명도로 흐리게
-      const av = '<span style="opacity:0.72;">' + inlineAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?')) + '</span>';
-      const metaBits = [tag, timeLabel].filter(Boolean).join(' ');
-      const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' +
-        (metaBits ? ' <span style="font-size:12px;opacity:0.7;">' + escapeHtml(metaBits) + '</span>' : '');
-      const body = '<span style="font-size:14px;line-height:1.5;font-style:italic;">' + messageHtml + '</span>';
-      return '<div style="background:' + bg + ';color:' + color + ';border:1px dashed rgba(255,255,255,0.18);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-family:\'Malgun Gothic\',\'Noto Sans KR\',sans-serif;">' + av + header + '<br>' + body + '</div>';
+      const av = tableAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?'));
+      const metaBits = [tag, '귓속말', timeLabel].filter(Boolean).join(' · ');
+      const header = '<b>' + escapeHtml(name) + '</b>' +
+        ' <span style="font-size:12px;">' + escapeHtml(metaBits) + '</span>';
+      return cardTableHtml(bg, color, av, header, messageHtml, true);
     }
 
-    // 시스템 알림: 이름 라벨 없이 가운데 정렬된 조용한 한 줄
+    // 시스템 알림: 이름 라벨 없이 가운데 정렬된 조용한 한 줄 (표 없이 단순 문단)
     if (isSystem) {
       const t = timeLabel ? escapeHtml(timeLabel) + ' ' : '';
       const tag = (entry.channel && entry.channelType === 'system') ? escapeHtml(entry.channel) + ' · ' : '';
-      return '<div style="text-align:center;color:#8a93a6;font-size:12px;margin:5px 0;font-family:\'Malgun Gothic\',\'Noto Sans KR\',sans-serif;">' + t + tag + messageHtml + '</div>';
+      return '<p style="text-align:center;color:#8a93a6;font-size:12px;margin:5px 0;' + COPY_FONT + '">' + t + tag + messageHtml + '</p>';
     }
 
-    // 감정표현: 캐릭터 색을 살린 가운데 정렬 알약 (본문에 행위자가 들어있어 이름 라벨 생략)
+    // 감정표현: 캐릭터 색을 살린 가운데 정렬 카드 (본문에 행위자가 들어있어 이름 라벨 생략)
     if (isEmote) {
       const bg = char ? char.bg : '#242c39';
       const color = char ? char.color : '#e9e4d6';
-      let avatarHtml = '';
+      let avInline = '';
       if (char && char.avatarType === 'image' && char.avatarValue) {
-        avatarHtml = '<img src="' + char.avatarValue + '" width="20" height="20" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">';
+        avInline = '<img src="' + char.avatarValue + '" width="20" height="20" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">';
       } else if (char && char.avatarValue) {
-        avatarHtml = '<span style="margin-right:6px;">' + escapeHtml(char.avatarValue) + '</span>';
+        avInline = escapeHtml(char.avatarValue) + ' ';
       }
-      const t = timeLabel ? ' <span style="font-style:normal;font-size:11px;opacity:0.65;">' + escapeHtml(timeLabel) + '</span>' : '';
+      const t = timeLabel ? ' <span style="font-style:normal;font-size:11px;">' + escapeHtml(timeLabel) + '</span>' : '';
       const emoteHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
-      return (
-        '<div style="text-align:center;margin:8px 0;font-family:\'Malgun Gothic\',\'Noto Sans KR\',sans-serif;">' +
-          '<span style="display:inline-block;background:' + bg + ';color:' + color + ';border-radius:999px;padding:7px 16px;font-style:italic;font-size:14px;">' +
-            avatarHtml + emoteHtml + t +
-          '</span>' +
-        '</div>'
-      );
+      return '<table border="0" cellpadding="0" cellspacing="0" align="center" style="border-collapse:collapse;border:none;margin:6px auto;' + COPY_FONT + '">' +
+        '<tr><td style="padding:7px 14px;background:' + bg + ';color:' + color + ';font-style:italic;font-size:14px;border:none;">' +
+          avInline + emoteHtml + t +
+        '</td></tr></table>';
     }
 
     // 일반 대화
@@ -935,28 +940,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const color = char ? char.color : '#e9e4d6';
     const displayName = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
     const channelLabel = (entry.channel && shouldShowChannel()) ? '[' + entry.channel + ']' : '';
-
-    let avatarHtml;
-    if (char && char.avatarType === 'image' && char.avatarValue) {
-      avatarHtml = '<img src="' + char.avatarValue + '" width="22" height="22" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">';
-    } else {
-      const emoji = char ? (char.avatarValue || '') : ((entry.nickname || '?').charAt(0) || '?');
-      const avatarBg = char ? char.bg : '#242c39';
-      const avatarColor = char ? char.color : '#8b93a3';
-      avatarHtml = '<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:' + avatarBg + ';color:' + avatarColor + ';font-size:12px;vertical-align:middle;margin-right:6px;">' + escapeHtml(emoji) + '</span>';
-    }
-
+    const av = tableAvatarHtml(char, (entry.nickname || '?').charAt(0) || '?');
     const metaBits = [channelLabel, timeLabel].filter(Boolean).join(' ');
-
-    return (
-      '<div style="background:' + bg + ';color:' + color + ';border-radius:8px;padding:8px 12px;margin-bottom:8px;font-family:\'Malgun Gothic\',\'Noto Sans KR\',sans-serif;">' +
-        avatarHtml +
-        '<b style="font-size:14px;">' + escapeHtml(displayName) + '</b>' +
-        (metaBits ? ' <span style="font-size:12px;opacity:0.7;">' + escapeHtml(metaBits) + '</span>' : '') +
-        '<br>' +
-        '<span style="font-size:14px;line-height:1.5;">' + messageHtml + '</span>' +
-      '</div>'
-    );
+    const header = '<b>' + escapeHtml(displayName) + '</b>' +
+      (metaBits ? ' <span style="font-size:12px;">' + escapeHtml(metaBits) + '</span>' : '');
+    return cardTableHtml(bg, color, av, header, messageHtml, false);
   }
 
   function buildPlainText(entry) {
