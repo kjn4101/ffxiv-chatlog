@@ -400,6 +400,73 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   /* ---------- 미리보기 렌더링 ---------- */
 
+  // 감정표현(/em 등 행위 묘사)은 RP에서 중요하므로, 캐릭터 색을 살린 가운데 정렬 알약으로 강조해요.
+  function buildEmoteLineNode(entry, char) {
+    const line = document.createElement('div');
+    line.className = 'log-line is-emote';
+
+    const inner = document.createElement('div');
+    inner.className = 'log-emote';
+    if (char) {
+      inner.style.background = char.bg;
+      inner.style.color = char.color;
+    }
+
+    const avatar = document.createElement('span');
+    avatar.className = 'log-emote-avatar';
+    if (char && char.avatarType === 'image' && char.avatarValue) {
+      avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
+    } else if (char) {
+      avatar.textContent = char.avatarValue || '＃';
+    }
+    inner.appendChild(avatar);
+
+    const msg = document.createElement('span');
+    msg.className = 'log-emote-msg';
+    msg.innerHTML = escapeHtml(entry.message).replace(/\n/g, '<br>');
+    inner.appendChild(msg);
+
+    if (entry.time) {
+      const t = document.createElement('span');
+      t.className = 'log-emote-time';
+      t.textContent = entry.time;
+      inner.appendChild(t);
+    }
+
+    line.appendChild(inner);
+    return line;
+  }
+
+  // 시스템 알림(공지·토벌 종료 등)은 조용한 한 줄로. 'unknown'은 라벨 없이 본문만, [이벤트]처럼
+  // 의미있는 대괄호 채널만 작은 태그로 붙여요.
+  function buildSystemLineNode(entry) {
+    const line = document.createElement('div');
+    line.className = 'log-line is-system';
+
+    const inner = document.createElement('div');
+    inner.className = 'log-system';
+
+    if (entry.time) {
+      const t = document.createElement('span');
+      t.className = 'log-system-time';
+      t.textContent = entry.time;
+      inner.appendChild(t);
+    }
+    if (entry.channel && entry.channelType === 'system') {
+      const tag = document.createElement('span');
+      tag.className = 'log-system-tag';
+      tag.textContent = entry.channel;
+      inner.appendChild(tag);
+    }
+    const msg = document.createElement('span');
+    msg.className = 'log-system-msg';
+    msg.innerHTML = escapeHtml(entry.message).replace(/\n/g, '<br>');
+    inner.appendChild(msg);
+
+    line.appendChild(inner);
+    return line;
+  }
+
   function renderPreview() {
     const text = document.getElementById('logInput').value;
     const filtered = getFilteredEntries(text);
@@ -409,12 +476,20 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
     filtered.forEach(entry => {
       const char = findCharacterByNickname(entry.nickname);
+      const isEmote = entry.channelType === 'emote';
+      const isSystem = !entry.nickname;
+
+      if (isSystem) {
+        preview.appendChild(buildSystemLineNode(entry));
+        return;
+      }
+      if (isEmote) {
+        preview.appendChild(buildEmoteLineNode(entry, char));
+        return;
+      }
 
       const line = document.createElement('div');
       line.className = 'log-line';
-
-      const isSystem = !entry.nickname;
-      if (isSystem) line.classList.add('is-system');
 
       const avatar = document.createElement('div');
       avatar.className = 'log-avatar';
@@ -426,9 +501,6 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         } else {
           avatar.textContent = char.avatarValue || '＃';
         }
-      } else if (isSystem) {
-        avatar.classList.add('log-avatar-default');
-        avatar.textContent = entry.channel ? entry.channel.charAt(0) : '!';
       } else {
         avatar.classList.add('log-avatar-default');
         avatar.textContent = (entry.nickname || '?').charAt(0) || '?';
@@ -445,10 +517,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
       const nameSpan = document.createElement('span');
       nameSpan.className = 'log-name';
-      nameSpan.textContent = isSystem ? (entry.channel || '시스템') : ((char && char.displayName) ? char.displayName : (entry.nickname || '???'));
+      nameSpan.textContent = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
       meta.appendChild(nameSpan);
 
-      if (entry.channel && shouldShowChannel() && !isSystem) {
+      if (entry.channel && shouldShowChannel()) {
         const chSpan = document.createElement('span');
         chSpan.className = 'log-channel';
         chSpan.textContent = '[' + entry.channel + ']';
@@ -506,24 +578,54 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   function buildLineHtml(entry) {
     const char = findCharacterByNickname(entry.nickname);
+    const isEmote = entry.channelType === 'emote';
     const isSystem = !entry.nickname;
+    const messageHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
+    const timeLabel = entry.time ? entry.time : '';
+
+    // 시스템 알림: 이름 라벨 없이 가운데 정렬된 조용한 한 줄
+    if (isSystem) {
+      const t = timeLabel ? escapeHtml(timeLabel) + ' ' : '';
+      const tag = (entry.channel && entry.channelType === 'system') ? escapeHtml(entry.channel) + ' · ' : '';
+      return '<div style="text-align:center;color:#8a93a6;font-size:12px;margin:5px 0;font-family:\'Malgun Gothic\',\'Noto Sans KR\',sans-serif;">' + t + tag + messageHtml + '</div>';
+    }
+
+    // 감정표현: 캐릭터 색을 살린 가운데 정렬 알약 (본문에 행위자가 들어있어 이름 라벨 생략)
+    if (isEmote) {
+      const bg = char ? char.bg : '#242c39';
+      const color = char ? char.color : '#e9e4d6';
+      let avatarHtml = '';
+      if (char && char.avatarType === 'image' && char.avatarValue) {
+        avatarHtml = '<img src="' + char.avatarValue + '" width="20" height="20" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">';
+      } else if (char) {
+        avatarHtml = '<span style="margin-right:6px;">' + escapeHtml(char.avatarValue || '＃') + '</span>';
+      }
+      const t = timeLabel ? ' <span style="font-style:normal;font-size:11px;opacity:0.65;">' + escapeHtml(timeLabel) + '</span>' : '';
+      return (
+        '<div style="text-align:center;margin:8px 0;font-family:\'Malgun Gothic\',\'Noto Sans KR\',sans-serif;">' +
+          '<span style="display:inline-block;background:' + bg + ';color:' + color + ';border-radius:999px;padding:7px 16px;font-style:italic;font-size:14px;">' +
+            avatarHtml + messageHtml + t +
+          '</span>' +
+        '</div>'
+      );
+    }
+
+    // 일반 대화
     const bg = char ? char.bg : '#242c39';
     const color = char ? char.color : '#e9e4d6';
-    const displayName = isSystem ? (entry.channel || '시스템') : ((char && char.displayName) ? char.displayName : (entry.nickname || '???'));
-    const channelLabel = (entry.channel && shouldShowChannel() && !isSystem) ? '[' + entry.channel + ']' : '';
-    const timeLabel = entry.time ? entry.time : '';
+    const displayName = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
+    const channelLabel = (entry.channel && shouldShowChannel()) ? '[' + entry.channel + ']' : '';
 
     let avatarHtml;
     if (char && char.avatarType === 'image' && char.avatarValue) {
       avatarHtml = '<img src="' + char.avatarValue + '" width="22" height="22" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">';
     } else {
-      const emoji = char ? (char.avatarValue || '＃') : (isSystem ? (entry.channel ? entry.channel.charAt(0) : '!') : ((entry.nickname || '?').charAt(0) || '?'));
+      const emoji = char ? (char.avatarValue || '＃') : ((entry.nickname || '?').charAt(0) || '?');
       const avatarBg = char ? char.bg : '#242c39';
       const avatarColor = char ? char.color : '#8b93a3';
       avatarHtml = '<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:' + avatarBg + ';color:' + avatarColor + ';font-size:12px;vertical-align:middle;margin-right:6px;">' + escapeHtml(emoji) + '</span>';
     }
 
-    const messageHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
     const metaBits = [channelLabel, timeLabel].filter(Boolean).join(' ');
 
     return (
@@ -539,10 +641,17 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   function buildPlainText(entry) {
     const char = findCharacterByNickname(entry.nickname);
+    const isEmote = entry.channelType === 'emote';
     const isSystem = !entry.nickname;
-    const name = isSystem ? (entry.channel || '시스템') : ((char && char.displayName) ? char.displayName : (entry.nickname || '???'));
     const timeLabel = entry.time ? '[' + entry.time + '] ' : '';
-    const channelLabel = (entry.channel && shouldShowChannel() && !isSystem) ? '[' + entry.channel + '] ' : '';
+
+    // 감정표현은 본문에 행위자가 들어있고, 시스템은 이름·채널 라벨이 불필요해요.
+    if (isSystem || isEmote) {
+      return timeLabel + entry.message;
+    }
+
+    const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
+    const channelLabel = (entry.channel && shouldShowChannel()) ? '[' + entry.channel + '] ' : '';
     return timeLabel + channelLabel + name + ': ' + entry.message;
   }
 
