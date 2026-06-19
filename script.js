@@ -167,6 +167,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   const hiddenOutputIds = new Set();
   let narrowToLog = true;
   let charSearchQuery = '';
+  let hiddenSectionOpen = false; // '숨긴 캐릭터' 접이식 섹션 펼침 여부
 
   function computePresentCharIds(logText) {
     const ids = new Set();
@@ -228,30 +229,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     saveCharacters();
   }
 
-  function renderCharList() {
-    const container = document.getElementById('charList');
-    container.innerHTML = '';
-
-    if (characters.length === 0) {
-      const hint = document.createElement('p');
-      hint.className = 'char-empty-hint';
-      hint.textContent = '아직 등록된 캐릭터가 없습니다. 아래 + 버튼으로 추가해주세요.';
-      container.appendChild(hint);
-      return;
-    }
-
-    const visible = getEditorChars();
-    if (visible.length === 0) {
-      const hint = document.createElement('p');
-      hint.className = 'char-empty-hint';
-      hint.textContent = charSearchQuery.trim()
-        ? '검색 결과가 없습니다.'
-        : '이 로그에 등장하는 등록 캐릭터가 없습니다. 위 토글을 끄면 전체 목록을 볼 수 있습니다.';
-      container.appendChild(hint);
-      return;
-    }
-
-    visible.forEach(c => {
+  function createCharRow(c) {
       const row = document.createElement('div');
       row.className = 'char-row';
       row.dataset.id = c.id;
@@ -383,7 +361,6 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       });
       meLabel.appendChild(meInput);
       meLabel.appendChild(document.createTextNode(' 내 캐릭터'));
-      fields.appendChild(meLabel);
 
       // 출력 포함 여부 (세션 상태) — 끄면 이 캐릭터 대사가 미리보기/이미지/복사에서 빠져요.
       const outLabel = document.createElement('label');
@@ -394,12 +371,18 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       outInput.addEventListener('change', () => {
         if (outInput.checked) hiddenOutputIds.delete(c.id);
         else hiddenOutputIds.add(c.id);
-        row.classList.toggle('char-hidden', !outInput.checked);
+        renderCharList(); // 숨김/표시에 따라 접이식 섹션으로 이동
         renderPreview();
       });
       outLabel.appendChild(outInput);
       outLabel.appendChild(document.createTextNode(' 출력에 표시'));
-      fields.appendChild(outLabel);
+
+      // 두 토글을 한 줄에 나란히
+      const toggleRow = document.createElement('div');
+      toggleRow.className = 'toggle-row';
+      toggleRow.appendChild(meLabel);
+      toggleRow.appendChild(outLabel);
+      fields.appendChild(toggleRow);
 
       if (hiddenOutputIds.has(c.id)) row.classList.add('char-hidden');
 
@@ -413,8 +396,64 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       removeBtn.addEventListener('click', () => removeCharacter(c.id));
       row.appendChild(removeBtn);
 
-      container.appendChild(row);
-    });
+      return row;
+  }
+
+  function renderCharList() {
+    const container = document.getElementById('charList');
+    container.innerHTML = '';
+
+    if (characters.length === 0) {
+      const hint = document.createElement('p');
+      hint.className = 'char-empty-hint';
+      hint.textContent = '아직 등록된 캐릭터가 없습니다. 아래 + 버튼으로 추가해주세요.';
+      container.appendChild(hint);
+      return;
+    }
+
+    const visible = getEditorChars();
+    if (visible.length === 0) {
+      const hint = document.createElement('p');
+      hint.className = 'char-empty-hint';
+      hint.textContent = charSearchQuery.trim()
+        ? '검색 결과가 없습니다.'
+        : '이 로그에 등장하는 등록 캐릭터가 없습니다. 위 토글을 끄면 전체 목록을 볼 수 있습니다.';
+      container.appendChild(hint);
+      return;
+    }
+
+    // 출력에 표시되는 캐릭터는 그대로, 숨긴 캐릭터는 아래 접이식 섹션으로 모아요.
+    const shown = visible.filter(c => !hiddenOutputIds.has(c.id));
+    const hidden = visible.filter(c => hiddenOutputIds.has(c.id));
+
+    shown.forEach(c => container.appendChild(createCharRow(c)));
+
+    if (shown.length === 0) {
+      const note = document.createElement('p');
+      note.className = 'char-empty-hint';
+      note.textContent = '표시 중인 캐릭터가 없습니다. 아래 숨긴 캐릭터에서 다시 켜거나 "모두 표시"를 누르세요.';
+      container.appendChild(note);
+    }
+
+    if (hidden.length > 0) {
+      const section = document.createElement('div');
+      section.className = 'hidden-section';
+
+      const header = document.createElement('button');
+      header.type = 'button';
+      header.className = 'hidden-section-header';
+      header.textContent = (hiddenSectionOpen ? '▾' : '▸') + ' 숨긴 캐릭터 ' + hidden.length + '명';
+      header.addEventListener('click', () => {
+        hiddenSectionOpen = !hiddenSectionOpen;
+        renderCharList();
+      });
+      section.appendChild(header);
+
+      if (hiddenSectionOpen) {
+        hidden.forEach(c => section.appendChild(createCharRow(c)));
+      }
+      container.appendChild(section);
+    }
   }
 
   /* ---------- 로그 파싱 ---------- */

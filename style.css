@@ -184,12 +184,19 @@
 
   .char-bulk button:hover { border-color: var(--cyan); color: var(--cyan); }
 
+  /* '내 캐릭터' / '출력에 표시' 토글을 한 줄에 나란히 */
+  .toggle-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-top: 6px;
+  }
+
   /* 출력 포함 토글 */
   .out-check {
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-top: 4px;
     font-size: 12px;
     color: var(--text-secondary);
     cursor: pointer;
@@ -197,8 +204,47 @@
 
   .out-check input { width: 14px; height: 14px; cursor: pointer; accent-color: var(--cyan); flex-shrink: 0; }
 
-  /* 출력에서 제외된 캐릭터 행은 흐리게 */
-  .char-row.char-hidden { opacity: 0.5; }
+  /* 캐릭터 목록이 길어지면 패널 안에서만 스크롤 */
+  #charList {
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 6px;
+  }
+
+  #charList::-webkit-scrollbar { width: 8px; }
+  #charList::-webkit-scrollbar-track { background: transparent; }
+  #charList::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 4px; }
+  #charList::-webkit-scrollbar-thumb:hover { background: var(--gold-deep); }
+
+  /* 숨긴 캐릭터 접이식 섹션 */
+  .hidden-section {
+    margin-top: 10px;
+    border-top: 1px dashed var(--border-soft);
+    padding-top: 10px;
+  }
+
+  .hidden-section-header {
+    width: 100%;
+    text-align: left;
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    color: var(--text-secondary);
+    font-size: 12px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+  }
+
+  .hidden-section-header:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  /* 접이식 섹션 안에 펼쳐진 숨긴 캐릭터 행은 살짝 탈색해 구분 */
+  .hidden-section .char-row {
+    margin-top: 10px;
+    opacity: 0.7;
+    filter: grayscale(0.4);
+  }
 
   /* ---------- 캐릭터 설정 패널 ---------- */
   .char-empty-hint {
@@ -327,7 +373,6 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    margin-top: 4px;
     font-size: 12px;
     color: var(--text-secondary);
     cursor: pointer;
