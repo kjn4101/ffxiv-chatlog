@@ -288,7 +288,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         renderPreview();
       });
       meLabel.appendChild(meInput);
-      meLabel.appendChild(document.createTextNode(' 내 캐릭터 (보낸 귓속말에 사용)'));
+      meLabel.appendChild(document.createTextNode(' 내 캐릭터'));
       fields.appendChild(meLabel);
 
       row.appendChild(fields);
