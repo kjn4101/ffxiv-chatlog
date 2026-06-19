@@ -463,6 +463,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     renderChannelFilter(entries);
     return entries.filter(entry => {
       if (channelFilterState[getFilterKey(entry)] === false) return false;
+      // 시스템 알림(닉네임 없음)은 사람의 대화가 아니므로 '등록된 닉네임만 표시'와 무관하게,
+      // 채널 필터만 켜져 있으면 보여줘요.
+      if (!entry.nickname) return true;
       const char = charForEntry(entry);
       if (onlyRegistered && !char) return false;
       return true;
