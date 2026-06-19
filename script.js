@@ -393,7 +393,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       removeBtn.className = 'remove-btn';
       removeBtn.title = '삭제';
       removeBtn.textContent = '✕';
-      removeBtn.addEventListener('click', () => removeCharacter(c.id));
+      removeBtn.addEventListener('click', () => {
+        const label = c.displayName || c.nickname || '이 캐릭터';
+        if (confirm('‘' + label + '’ 캐릭터 설정을 삭제할까요? 되돌릴 수 없습니다.')) {
+          removeCharacter(c.id);
+        }
+      });
       row.appendChild(removeBtn);
 
       return row;
