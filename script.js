@@ -86,6 +86,18 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return characters.find(c => c.isMe);
   }
 
+  // 닉네임 하나를 화면용 이름으로 — 등록돼 있고 표시 이름이 있으면 그 이름, 없으면 닉네임 그대로.
+  function nickToDisplay(nick) {
+    const c = findCharacterByNickname(nick);
+    return (c && c.displayName) ? c.displayName : (normalizeNick(nick) || nick || '');
+  }
+
+  // '내 캐릭터'의 화면용 이름 (지정 안 했으면 '나').
+  function myDisplayName() {
+    const my = getMyCharacter();
+    return my ? (my.displayName || my.nickname || '나') : '나';
+  }
+
   function charForEntry(entry) {
     // 내가 보낸 귓속말은 받는 상대가 아니라 '내 캐릭터'를 기준으로 표시·필터링해요.
     if (entry.channelType === 'whisper-out') return getMyCharacter();
@@ -529,18 +541,18 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const meta = document.createElement('div');
     meta.className = 'log-meta';
 
+    // 보낸/받은 귓속말 모두 "보낸사람 → 받은사람" 형식으로 통일해요.
+    const senderName = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
+    const receiverName = isOut ? nickToDisplay(entry.recipient) : myDisplayName();
+
     const nameSpan = document.createElement('span');
     nameSpan.className = 'log-name';
-    if (isOut) {
-      nameSpan.textContent = char ? (char.displayName || char.nickname || '나') : '나';
-    } else {
-      nameSpan.textContent = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
-    }
+    nameSpan.textContent = senderName;
     meta.appendChild(nameSpan);
 
     const tagSpan = document.createElement('span');
     tagSpan.className = 'log-whisper-tag';
-    tagSpan.textContent = isOut ? ('→ ' + (entry.recipient || '귓속말')) : '귓속말';
+    tagSpan.textContent = '→ ' + receiverName;
     meta.appendChild(tagSpan);
 
     const timeSpan = document.createElement('span');
@@ -726,18 +738,15 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const wChar = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
       const bg = wChar ? hexToRgba(wChar.bg, 0.72) : 'rgba(36, 44, 57, 0.72)';
       const color = wChar ? wChar.color : '#e9e4d6';
-      const name = isOut
-        ? (wChar ? (wChar.displayName || wChar.nickname || '나') : '나')
-        : ((wChar && wChar.displayName) ? wChar.displayName : (entry.nickname || '???'));
-      const tag = isOut ? ('→ ' + (entry.recipient || '귓속말')) : '귓속말';
-      const av = inlineAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?'));
+      const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
+      const tag = '→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName());
+      // 아바타도 말풍선과 같은 투명도로 흐리게
+      const av = '<span style="opacity:0.72;">' + inlineAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?')) + '</span>';
       const metaBits = [tag, timeLabel].filter(Boolean).join(' ');
       const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' +
         (metaBits ? ' <span style="font-size:12px;opacity:0.7;">' + escapeHtml(metaBits) + '</span>' : '');
       const body = '<span style="font-size:14px;line-height:1.5;font-style:italic;">' + messageHtml + '</span>';
-      const align = isOut ? 'left' : 'right';
-      const inner = isOut ? (av + header + '<br>' + body) : (header + av + '<br>' + body);
-      return '<div style="background:' + bg + ';color:' + color + ';border:1px dashed rgba(255,255,255,0.18);border-radius:8px;padding:8px 12px;margin-bottom:8px;text-align:' + align + ';font-family:\'Malgun Gothic\',\'Noto Sans KR\',sans-serif;">' + inner + '</div>';
+      return '<div style="background:' + bg + ';color:' + color + ';border:1px dashed rgba(255,255,255,0.18);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-family:\'Malgun Gothic\',\'Noto Sans KR\',sans-serif;">' + av + header + '<br>' + body + '</div>';
     }
 
     // 시스템 알림: 이름 라벨 없이 가운데 정렬된 조용한 한 줄
@@ -804,13 +813,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const timeLabel = entry.time ? '[' + entry.time + '] ' : '';
 
     if (entry.channelType === 'whisper-out') {
-      const my = getMyCharacter();
-      const myName = my ? (my.displayName || my.nickname || '나') : '나';
-      return timeLabel + myName + ' → ' + (entry.recipient || '') + ' (귓속말): ' + entry.message;
+      return timeLabel + myDisplayName() + ' → ' + nickToDisplay(entry.recipient) + ' (귓속말): ' + entry.message;
     }
     if (entry.channelType === 'whisper-in') {
-      const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
-      return timeLabel + name + ' (귓속말): ' + entry.message;
+      return timeLabel + nickToDisplay(entry.nickname) + ' → ' + myDisplayName() + ' (귓속말): ' + entry.message;
     }
 
     // 감정표현은 본문에 행위자가 들어있고, 시스템은 이름·채널 라벨이 불필요해요.
