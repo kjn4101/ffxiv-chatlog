@@ -141,6 +141,65 @@
     letter-spacing: 0.5px;
   }
 
+  /* 캐릭터 편집 목록 상단 컨트롤 */
+  .char-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+
+  .char-controls #charSearch {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 13px;
+  }
+
+  .char-controls #charSearch::placeholder { color: var(--text-secondary); }
+
+  .char-bulk {
+    display: flex;
+    gap: 8px;
+  }
+
+  .char-bulk button {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    color: var(--text-secondary);
+    font-size: 12px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+  }
+
+  .char-bulk button:hover { border-color: var(--cyan); color: var(--cyan); }
+
+  /* 출력 포함 토글 */
+  .out-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .out-check input { width: 14px; height: 14px; cursor: pointer; accent-color: var(--cyan); flex-shrink: 0; }
+
+  /* 출력에서 제외된 캐릭터 행은 흐리게 */
+  .char-row.char-hidden { opacity: 0.5; }
+
   /* ---------- 캐릭터 설정 패널 ---------- */
   .char-empty-hint {
     color: var(--text-secondary);
@@ -365,6 +424,46 @@
   }
 
   .reset-link:hover { color: var(--danger); }
+
+  .bg-color-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--text-secondary);
+  }
+
+  .bg-color-row label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    cursor: pointer;
+  }
+
+  .bg-color-row input[type="color"] {
+    width: 30px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--border-soft);
+    border-radius: 5px;
+    background: none;
+    cursor: pointer;
+  }
+
+  .bg-color-row button {
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    color: var(--text-secondary);
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+  }
+
+  .bg-color-row button:hover { border-color: var(--cyan); color: var(--cyan); }
 
   .channel-filter-heading {
     margin-top: 16px;

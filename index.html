@@ -20,6 +20,17 @@
   <div class="layout">
     <aside class="panel">
       <h2>닉네임 설정</h2>
+      <div class="char-controls">
+        <input type="text" id="charSearch" placeholder="캐릭터 검색…">
+        <label class="switch-label">
+          <input type="checkbox" id="narrowToggle" checked>
+          이 로그에 등장하는 캐릭터만 보기
+        </label>
+        <div class="char-bulk">
+          <button id="showAllChars" type="button">모두 표시</button>
+          <button id="hideAllChars" type="button">모두 숨김</button>
+        </div>
+      </div>
       <div id="charList"></div>
       <button id="addCharBtn" class="btn btn-ghost" type="button">+ 캐릭터 추가</button>
       <div class="filter-row">
@@ -31,6 +42,10 @@
           <input type="checkbox" id="showChannelToggle" checked>
           [자유부대]/[파티] 같은 채널 이름 표시
         </label>
+        <div class="bg-color-row">
+          <label>로그 배경색<input type="color" id="logBgColor"></label>
+          <button id="logBgReset" type="button">기본값</button>
+        </div>
         <div class="channel-filter-heading">채널 필터 (체크한 채널만 표시됩니다)</div>
         <div id="channelFilterList" class="channel-filter-group">
           <p class="char-empty-hint">로그 변환을 시도하면 채널 목록이 하단에 나타납니다.</p>

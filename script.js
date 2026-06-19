@@ -17,6 +17,35 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   let characters = loadCharacters();
 
+  /* ---------- 표시 설정 (로그 배경색 등) ---------- */
+  const SETTINGS_KEY = 'ffxiv_echo_log_settings';
+  const DEFAULT_BG = '#161d28';
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  let settings = loadSettings();
+  if (!settings.bgColor) settings.bgColor = DEFAULT_BG;
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    } catch (e) { /* localStorage 사용 불가 시 무시 */ }
+  }
+
+  function applyLogBackground() {
+    const frame = document.querySelector('.preview-frame');
+    const preview = document.getElementById('preview');
+    if (frame) frame.style.background = settings.bgColor;
+    if (preview) preview.style.background = settings.bgColor;
+  }
+
   // 예전 버전의 기본 아바타(🙂 또는 ＃)가 남아있으면 '비어있음(색만 표시)'으로 정리해요.
   let migrated = false;
   characters.forEach(c => {
@@ -128,10 +157,47 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return result;
   }
 
+  /* ---------- 편집 목록/출력 선택용 세션 상태 ----------
+     모두 새로고침하면 초기화돼요. 캐릭터 데이터(localStorage)에는 저장하지 않아요.
+     - pinnedIds: 이번 세션에 새로 추가한 캐릭터 (로그 narrowing과 무관하게 항상 편집 목록에 보임)
+     - hiddenOutputIds: 출력에서 제외한 캐릭터
+     - narrowToLog: '이 로그에 등장하는 캐릭터만 보기' 토글
+     - charSearchQuery: 캐릭터 검색어 */
+  const pinnedIds = new Set();
+  const hiddenOutputIds = new Set();
+  let narrowToLog = true;
+  let charSearchQuery = '';
+
+  function computePresentCharIds(logText) {
+    const ids = new Set();
+    parseLog(logText).forEach(e => {
+      const c = charForEntry(e);
+      if (c) ids.add(c.id);
+    });
+    return ids;
+  }
+
+  // 편집 목록에 보여줄 캐릭터를 추려요.
+  // 검색 중이면 전체에서 검색(라이브러리 조회), 아니면 narrowing 규칙 적용.
+  function getEditorChars() {
+    const q = charSearchQuery.trim().toLowerCase();
+    if (q) {
+      return characters.filter(c =>
+        (c.nickname || '').toLowerCase().includes(q) ||
+        (c.displayName || '').toLowerCase().includes(q));
+    }
+    const logText = document.getElementById('logInput').value;
+    if (!narrowToLog || logText.trim() === '') return characters;
+    const present = computePresentCharIds(logText);
+    // 등장 캐릭터 + 이번 세션에 추가한 캐릭터 + 닉네임이 비어있는(작성 중) 캐릭터
+    return characters.filter(c =>
+      present.has(c.id) || pinnedIds.has(c.id) || normalizeNick(c.nickname) === '');
+  }
+
   /* ---------- 캐릭터 CRUD ---------- */
 
   function addCharacter() {
-    characters.push({
+    const c = {
       id: uid(),
       nickname: '',
       displayName: '',
@@ -139,13 +205,17 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       color: '#e9e4d6',
       avatarType: 'emoji',
       avatarValue: ''
-    });
+    };
+    characters.push(c);
+    pinnedIds.add(c.id); // 새로 추가한 캐릭터는 narrowing 중에도 사라지지 않게 고정
     saveCharacters();
     renderCharList();
   }
 
   function removeCharacter(id) {
     characters = characters.filter(c => c.id !== id);
+    pinnedIds.delete(id);
+    hiddenOutputIds.delete(id);
     saveCharacters();
     renderCharList();
     renderPreview();
@@ -170,7 +240,18 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return;
     }
 
-    characters.forEach(c => {
+    const visible = getEditorChars();
+    if (visible.length === 0) {
+      const hint = document.createElement('p');
+      hint.className = 'char-empty-hint';
+      hint.textContent = charSearchQuery.trim()
+        ? '검색 결과가 없습니다.'
+        : '이 로그에 등장하는 등록 캐릭터가 없습니다. 위 토글을 끄면 전체 목록을 볼 수 있습니다.';
+      container.appendChild(hint);
+      return;
+    }
+
+    visible.forEach(c => {
       const row = document.createElement('div');
       row.className = 'char-row';
       row.dataset.id = c.id;
@@ -303,6 +384,24 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       meLabel.appendChild(meInput);
       meLabel.appendChild(document.createTextNode(' 내 캐릭터'));
       fields.appendChild(meLabel);
+
+      // 출력 포함 여부 (세션 상태) — 끄면 이 캐릭터 대사가 미리보기/이미지/복사에서 빠져요.
+      const outLabel = document.createElement('label');
+      outLabel.className = 'out-check';
+      const outInput = document.createElement('input');
+      outInput.type = 'checkbox';
+      outInput.checked = !hiddenOutputIds.has(c.id);
+      outInput.addEventListener('change', () => {
+        if (outInput.checked) hiddenOutputIds.delete(c.id);
+        else hiddenOutputIds.add(c.id);
+        row.classList.toggle('char-hidden', !outInput.checked);
+        renderPreview();
+      });
+      outLabel.appendChild(outInput);
+      outLabel.appendChild(document.createTextNode(' 출력에 표시'));
+      fields.appendChild(outLabel);
+
+      if (hiddenOutputIds.has(c.id)) row.classList.add('char-hidden');
 
       row.appendChild(fields);
 
@@ -468,6 +567,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       // 채널 필터만 켜져 있으면 보여줘요.
       if (!entry.nickname) return true;
       const char = charForEntry(entry);
+      // 출력에서 제외한 캐릭터의 대사는 숨겨요.
+      if (char && hiddenOutputIds.has(char.id)) return false;
       if (onlyRegistered && !char) return false;
       return true;
     });
@@ -707,7 +808,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       alert('이미지 저장 기능을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.');
       return;
     }
-    html2canvas(node, { backgroundColor: '#161d28', scale: 2 }).then(canvas => {
+    html2canvas(node, { backgroundColor: settings.bgColor, scale: 2 }).then(canvas => {
       const link = document.createElement('a');
       link.download = 'ffxiv_log_' + Date.now() + '.png';
       link.href = canvas.toDataURL('image/png');
@@ -957,14 +1058,56 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   document.getElementById('textCopyBtn').addEventListener('click', copyPlainText);
   document.getElementById('exportBtn').addEventListener('click', exportImage);
 
+  const logBgColorInput = document.getElementById('logBgColor');
+  logBgColorInput.value = settings.bgColor;
+  logBgColorInput.addEventListener('input', () => {
+    settings.bgColor = logBgColorInput.value;
+    saveSettings();
+    applyLogBackground();
+  });
+  document.getElementById('logBgReset').addEventListener('click', () => {
+    settings.bgColor = DEFAULT_BG;
+    logBgColorInput.value = DEFAULT_BG;
+    saveSettings();
+    applyLogBackground();
+  });
+
+  // 캐릭터 검색
+  const charSearchInput = document.getElementById('charSearch');
+  charSearchInput.addEventListener('input', () => {
+    charSearchQuery = charSearchInput.value;
+    renderCharList();
+  });
+
+  // '이 로그에 등장하는 캐릭터만 보기' 토글
+  document.getElementById('narrowToggle').addEventListener('change', (e) => {
+    narrowToLog = e.target.checked;
+    renderCharList();
+  });
+
+  // 출력 일괄 표시/숨김 (현재 편집 목록에 보이는 캐릭터 기준)
+  document.getElementById('showAllChars').addEventListener('click', () => {
+    hiddenOutputIds.clear();
+    renderCharList();
+    renderPreview();
+  });
+  document.getElementById('hideAllChars').addEventListener('click', () => {
+    getEditorChars().forEach(c => hiddenOutputIds.add(c.id));
+    renderCharList();
+    renderPreview();
+  });
+
   document.getElementById('clearBtn').addEventListener('click', () => {
     document.getElementById('logInput').value = '';
     renderPreview();
+    renderCharList(); // 로그가 비면 편집 목록은 전체로 돌아가요.
   });
 
   document.getElementById('resetBtn').addEventListener('click', () => {
     if (confirm('등록된 모든 캐릭터 설정을 삭제할까요? 되돌릴 수 없습니다.')) {
       characters = [];
+      pinnedIds.clear();
+      hiddenOutputIds.clear();
       saveCharacters();
       renderCharList();
       renderPreview();
@@ -974,7 +1117,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   let debounceTimer;
   document.getElementById('logInput').addEventListener('input', () => {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(renderPreview, 250);
+    debounceTimer = setTimeout(() => {
+      renderPreview();
+      renderCharList(); // 로그 내용이 바뀌면 등장 캐릭터 기준으로 편집 목록도 다시 좁혀요.
+    }, 250);
   });
 
   renderCharList();
+  applyLogBackground();
