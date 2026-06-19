@@ -17,11 +17,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   let characters = loadCharacters();
 
-  // 예전 버전에서 저장된 기본 이모지(🙂)가 남아있다면 새 기본값(＃)으로 정리
+  // 예전 버전의 기본 아바타(🙂 또는 ＃)가 남아있으면 '비어있음(색만 표시)'으로 정리해요.
   let migrated = false;
   characters.forEach(c => {
-    if (c.avatarType === 'emoji' && c.avatarValue === '🙂') {
-      c.avatarValue = '＃';
+    if (c.avatarType === 'emoji' && (c.avatarValue === '🙂' || c.avatarValue === '＃')) {
+      c.avatarValue = '';
       migrated = true;
     }
   });
@@ -138,7 +138,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       bg: '#26303f',
       color: '#e9e4d6',
       avatarType: 'emoji',
-      avatarValue: '＃'
+      avatarValue: ''
     });
     saveCharacters();
     renderCharList();
@@ -186,7 +186,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       if (c.avatarType === 'image' && c.avatarValue) {
         avatarPreview.innerHTML = '<img src="' + c.avatarValue + '" alt="">';
       } else {
-        avatarPreview.textContent = c.avatarValue || '＃';
+        // 비어있으면 색상만 — 글씨/이모지를 넣었을 때만 표시
+        avatarPreview.textContent = c.avatarValue || '';
       }
       avatarWrap.appendChild(avatarPreview);
 
@@ -195,11 +196,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       emojiInput.className = 'avatar-emoji-input';
       emojiInput.maxLength = 4;
       emojiInput.placeholder = '이모지';
-      emojiInput.value = c.avatarType === 'emoji' ? (c.avatarValue || '＃') : '';
+      emojiInput.value = c.avatarType === 'emoji' ? (c.avatarValue || '') : '';
       emojiInput.addEventListener('input', () => {
         updateCharacter(c.id, { avatarType: 'emoji', avatarValue: emojiInput.value });
         avatarPreview.innerHTML = '';
-        avatarPreview.textContent = emojiInput.value || '＃';
+        avatarPreview.textContent = emojiInput.value || '';
         renderPreview();
       });
       avatarWrap.appendChild(emojiInput);
@@ -486,14 +487,19 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       inner.style.color = char.color;
     }
 
-    const avatar = document.createElement('span');
-    avatar.className = 'log-emote-avatar';
-    if (char && char.avatarType === 'image' && char.avatarValue) {
-      avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
-    } else if (char) {
-      avatar.textContent = char.avatarValue || '＃';
+    // 이미지나 이모지가 있을 때만 아바타를 붙이고, 비어있으면 아예 생략해 알약을 깔끔하게 둬요.
+    const hasImage = char && char.avatarType === 'image' && char.avatarValue;
+    const hasEmoji = char && char.avatarType !== 'image' && char.avatarValue;
+    if (hasImage || hasEmoji) {
+      const avatar = document.createElement('span');
+      avatar.className = 'log-emote-avatar';
+      if (hasImage) {
+        avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
+      } else {
+        avatar.textContent = char.avatarValue;
+      }
+      inner.appendChild(avatar);
     }
-    inner.appendChild(avatar);
 
     const msg = document.createElement('span');
     msg.className = 'log-emote-msg';
@@ -528,7 +534,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       if (char.avatarType === 'image' && char.avatarValue) {
         avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
       } else {
-        avatar.textContent = char.avatarValue || '＃';
+        avatar.textContent = char.avatarValue || '';
       }
     } else {
       avatar.classList.add('log-avatar-default');
@@ -640,7 +646,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         if (char.avatarType === 'image' && char.avatarValue) {
           avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
         } else {
-          avatar.textContent = char.avatarValue || '＃';
+          avatar.textContent = char.avatarValue || '';
         }
       } else {
         avatar.classList.add('log-avatar-default');
@@ -721,7 +727,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     if (char && char.avatarType === 'image' && char.avatarValue) {
       return '<img src="' + char.avatarValue + '" width="22" height="22" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin:0 6px;">';
     }
-    const emoji = char ? (char.avatarValue || '＃') : (fallback || '?');
+    const emoji = char ? (char.avatarValue || '') : (fallback || '?');
     const avatarBg = char ? char.bg : '#242c39';
     const avatarColor = char ? char.color : '#8b93a3';
     return '<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:' + avatarBg + ';color:' + avatarColor + ';font-size:12px;vertical-align:middle;margin:0 6px;">' + escapeHtml(emoji) + '</span>';
@@ -766,8 +772,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       let avatarHtml = '';
       if (char && char.avatarType === 'image' && char.avatarValue) {
         avatarHtml = '<img src="' + char.avatarValue + '" width="20" height="20" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">';
-      } else if (char) {
-        avatarHtml = '<span style="margin-right:6px;">' + escapeHtml(char.avatarValue || '＃') + '</span>';
+      } else if (char && char.avatarValue) {
+        avatarHtml = '<span style="margin-right:6px;">' + escapeHtml(char.avatarValue) + '</span>';
       }
       const t = timeLabel ? ' <span style="font-style:normal;font-size:11px;opacity:0.65;">' + escapeHtml(timeLabel) + '</span>' : '';
       const emoteHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
@@ -790,7 +796,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     if (char && char.avatarType === 'image' && char.avatarValue) {
       avatarHtml = '<img src="' + char.avatarValue + '" width="22" height="22" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;">';
     } else {
-      const emoji = char ? (char.avatarValue || '＃') : ((entry.nickname || '?').charAt(0) || '?');
+      const emoji = char ? (char.avatarValue || '') : ((entry.nickname || '?').charAt(0) || '?');
       const avatarBg = char ? char.bg : '#242c39';
       const avatarColor = char ? char.color : '#8b93a3';
       avatarHtml = '<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:' + avatarBg + ';color:' + avatarColor + ';font-size:12px;vertical-align:middle;margin-right:6px;">' + escapeHtml(emoji) + '</span>';
