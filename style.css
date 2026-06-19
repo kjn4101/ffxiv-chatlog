@@ -264,6 +264,18 @@
     cursor: pointer;
   }
 
+  .me-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .me-check input { width: 14px; height: 14px; cursor: pointer; accent-color: var(--gold); flex-shrink: 0; }
+
   .remove-btn {
     background: transparent;
     border: 1px solid var(--border-soft);
@@ -606,6 +618,35 @@
     font-size: 11px;
     opacity: 0.65;
   }
+
+  /* 귓속말 — 사적으로 소근거리는 느낌(반투명·이탤릭). 받은 건 오른쪽으로 정렬. */
+  .log-line.is-whisper { opacity: 0.93; }
+
+  .log-line.is-whisper .log-bubble {
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+    box-shadow: none;
+  }
+
+  .log-line.is-whisper .log-message {
+    font-style: italic;
+    opacity: 0.92;
+  }
+
+  .log-whisper-tag {
+    font-size: 11px;
+    opacity: 0.7;
+  }
+
+  /* 받은 귓속말 — 아바타를 오른쪽에 두고 내용도 우측 정렬 */
+  .log-line.whisper-in { flex-direction: row-reverse; }
+
+  .log-line.whisper-in .log-meta {
+    justify-content: flex-end;
+  }
+
+  .log-line.whisper-in .log-time { margin-left: 0; }
+
+  .log-line.whisper-in .log-message { text-align: right; }
 
   /* 시스템 알림 — 이름 라벨 없이 가운데 정렬된 조용한 한 줄 */
   .log-line.is-system { justify-content: center; }

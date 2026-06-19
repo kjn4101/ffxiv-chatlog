@@ -82,6 +82,25 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return characters.find(c => normalizeNick(c.nickname) === norm);
   }
 
+  function getMyCharacter() {
+    return characters.find(c => c.isMe);
+  }
+
+  function charForEntry(entry) {
+    // 내가 보낸 귓속말은 받는 상대가 아니라 '내 캐릭터'를 기준으로 표시·필터링해요.
+    if (entry.channelType === 'whisper-out') return getMyCharacter();
+    return findCharacterByNickname(entry.nickname);
+  }
+
+  function hexToRgba(hex, alpha) {
+    const h = (hex || '').replace('#', '');
+    if (h.length !== 6) return hex;
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
+  }
+
   /* ---------- 캐릭터 CRUD ---------- */
 
   function addCharacter() {
@@ -236,6 +255,27 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       colorRow.appendChild(colorLabel);
 
       fields.appendChild(colorRow);
+
+      // '내 캐릭터' 지정 — 내가 보낸 귓속말을 이 캐릭터 이름으로 표시해요. 한 명만 지정돼요.
+      const meLabel = document.createElement('label');
+      meLabel.className = 'me-check';
+      const meInput = document.createElement('input');
+      meInput.type = 'checkbox';
+      meInput.checked = !!c.isMe;
+      meInput.addEventListener('change', () => {
+        if (meInput.checked) {
+          characters.forEach(o => { o.isMe = (o.id === c.id); });
+        } else {
+          c.isMe = false;
+        }
+        saveCharacters();
+        renderCharList();
+        renderPreview();
+      });
+      meLabel.appendChild(meInput);
+      meLabel.appendChild(document.createTextNode(' 내 캐릭터 (보낸 귓속말에 사용)'));
+      fields.appendChild(meLabel);
+
       row.appendChild(fields);
 
       const removeBtn = document.createElement('button');
@@ -274,7 +314,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   function parseRest(rest) {
     let m = rest.match(/^>>\s*([^:：]+)[:：]\s?(.*)$/);
-    if (m) return { channelType: 'whisper-out', channel: '귓속말(보냄)', nickname: stripDecoration(m[1]), message: m[2] };
+    if (m) {
+      const to = stripDecoration(m[1]);
+      // nickname에는 받는 상대를 넣어두되, 표시는 렌더링 단계에서 '내 캐릭터'로 바꿔요.
+      return { channelType: 'whisper-out', channel: '귓속말', nickname: to, recipient: to, message: m[2] };
+    }
 
     m = rest.match(/^\[([^\]]+)\]<([^>]+)>\s?(.*)$/);
     if (m) {
@@ -392,7 +436,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     renderChannelFilter(entries);
     return entries.filter(entry => {
       if (channelFilterState[getFilterKey(entry)] === false) return false;
-      const char = findCharacterByNickname(entry.nickname);
+      const char = charForEntry(entry);
       if (onlyRegistered && !char) return false;
       return true;
     });
@@ -434,6 +478,69 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
 
     line.appendChild(inner);
+    return line;
+  }
+
+  // 귓속말은 사적인 느낌이 나도록 반투명·이탤릭으로 조용하게 표시해요.
+  // 보낸 귓속말은 '내 캐릭터' 이름으로 왼쪽에, 받은 귓속말은 상대 아바타를 오른쪽에 두고 우측 정렬해요.
+  function buildWhisperNode(entry) {
+    const isOut = entry.channelType === 'whisper-out';
+    const char = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
+
+    const line = document.createElement('div');
+    line.className = 'log-line is-whisper ' + (isOut ? 'whisper-out' : 'whisper-in');
+
+    const avatar = document.createElement('div');
+    avatar.className = 'log-avatar';
+    if (char) {
+      avatar.style.background = char.bg;
+      avatar.style.color = char.color;
+      if (char.avatarType === 'image' && char.avatarValue) {
+        avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
+      } else {
+        avatar.textContent = char.avatarValue || '＃';
+      }
+    } else {
+      avatar.classList.add('log-avatar-default');
+      avatar.textContent = isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?');
+    }
+    line.appendChild(avatar);
+
+    const bubble = document.createElement('div');
+    bubble.className = 'log-bubble';
+    bubble.style.background = char ? hexToRgba(char.bg, 0.72) : 'rgba(36, 44, 57, 0.72)';
+    bubble.style.color = char ? char.color : 'var(--text-primary)';
+
+    const meta = document.createElement('div');
+    meta.className = 'log-meta';
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'log-name';
+    if (isOut) {
+      nameSpan.textContent = char ? (char.displayName || char.nickname || '나') : '나';
+    } else {
+      nameSpan.textContent = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
+    }
+    meta.appendChild(nameSpan);
+
+    const tagSpan = document.createElement('span');
+    tagSpan.className = 'log-whisper-tag';
+    tagSpan.textContent = isOut ? ('→ ' + (entry.recipient || '귓속말')) : '귓속말';
+    meta.appendChild(tagSpan);
+
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'log-time';
+    timeSpan.textContent = entry.time;
+    if (entry.time) meta.appendChild(timeSpan);
+
+    bubble.appendChild(meta);
+
+    const msg = document.createElement('div');
+    msg.className = 'log-message';
+    msg.innerHTML = escapeHtml(entry.message).replace(/\n/g, '<br>');
+    bubble.appendChild(msg);
+
+    line.appendChild(bubble);
     return line;
   }
 
@@ -479,6 +586,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const isEmote = entry.channelType === 'emote';
       const isSystem = !entry.nickname;
 
+      if (entry.channelType === 'whisper-out' || entry.channelType === 'whisper-in') {
+        preview.appendChild(buildWhisperNode(entry));
+        return;
+      }
       if (isSystem) {
         preview.appendChild(buildSystemLineNode(entry));
         return;
@@ -576,12 +687,43 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
      표(table)나 float는 카페/블로그 에디터에 붙여넣을 때 깨지기 쉬워서,
      아바타를 이름 앞에 붙는 작은 인라인 아이콘으로 두는 단순한 구조를 써요. */
 
+  function inlineAvatarHtml(char, fallback) {
+    if (char && char.avatarType === 'image' && char.avatarValue) {
+      return '<img src="' + char.avatarValue + '" width="22" height="22" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin:0 6px;">';
+    }
+    const emoji = char ? (char.avatarValue || '＃') : (fallback || '?');
+    const avatarBg = char ? char.bg : '#242c39';
+    const avatarColor = char ? char.color : '#8b93a3';
+    return '<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:' + avatarBg + ';color:' + avatarColor + ';font-size:12px;vertical-align:middle;margin:0 6px;">' + escapeHtml(emoji) + '</span>';
+  }
+
   function buildLineHtml(entry) {
     const char = findCharacterByNickname(entry.nickname);
     const isEmote = entry.channelType === 'emote';
-    const isSystem = !entry.nickname;
+    const isWhisper = entry.channelType === 'whisper-out' || entry.channelType === 'whisper-in';
+    const isSystem = !entry.nickname && !isWhisper;
     const messageHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
     const timeLabel = entry.time ? entry.time : '';
+
+    // 귓속말: 반투명 이탤릭. 보낸 건 왼쪽(내 캐릭터), 받은 건 오른쪽 정렬.
+    if (isWhisper) {
+      const isOut = entry.channelType === 'whisper-out';
+      const wChar = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
+      const bg = wChar ? hexToRgba(wChar.bg, 0.72) : 'rgba(36, 44, 57, 0.72)';
+      const color = wChar ? wChar.color : '#e9e4d6';
+      const name = isOut
+        ? (wChar ? (wChar.displayName || wChar.nickname || '나') : '나')
+        : ((wChar && wChar.displayName) ? wChar.displayName : (entry.nickname || '???'));
+      const tag = isOut ? ('→ ' + (entry.recipient || '귓속말')) : '귓속말';
+      const av = inlineAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?'));
+      const metaBits = [tag, timeLabel].filter(Boolean).join(' ');
+      const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' +
+        (metaBits ? ' <span style="font-size:12px;opacity:0.7;">' + escapeHtml(metaBits) + '</span>' : '');
+      const body = '<span style="font-size:14px;line-height:1.5;font-style:italic;">' + messageHtml + '</span>';
+      const align = isOut ? 'left' : 'right';
+      const inner = isOut ? (av + header + '<br>' + body) : (header + av + '<br>' + body);
+      return '<div style="background:' + bg + ';color:' + color + ';border:1px dashed rgba(255,255,255,0.18);border-radius:8px;padding:8px 12px;margin-bottom:8px;text-align:' + align + ';font-family:\'Malgun Gothic\',\'Noto Sans KR\',sans-serif;">' + inner + '</div>';
+    }
 
     // 시스템 알림: 이름 라벨 없이 가운데 정렬된 조용한 한 줄
     if (isSystem) {
@@ -642,8 +784,18 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   function buildPlainText(entry) {
     const char = findCharacterByNickname(entry.nickname);
     const isEmote = entry.channelType === 'emote';
-    const isSystem = !entry.nickname;
+    const isSystem = !entry.nickname && entry.channelType !== 'whisper-out';
     const timeLabel = entry.time ? '[' + entry.time + '] ' : '';
+
+    if (entry.channelType === 'whisper-out') {
+      const my = getMyCharacter();
+      const myName = my ? (my.displayName || my.nickname || '나') : '나';
+      return timeLabel + myName + ' → ' + (entry.recipient || '') + ' (귓속말): ' + entry.message;
+    }
+    if (entry.channelType === 'whisper-in') {
+      const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
+      return timeLabel + name + ' (귓속말): ' + entry.message;
+    }
 
     // 감정표현은 본문에 행위자가 들어있고, 시스템은 이름·채널 라벨이 불필요해요.
     if (isSystem || isEmote) {
