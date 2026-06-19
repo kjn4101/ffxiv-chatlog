@@ -101,6 +101,21 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
   }
 
+  // 감정표현 문장 안에 등장하는 등록된 닉네임을, 표시 이름이 지정돼 있으면 그 이름으로 바꿔요.
+  // (예: "카페르티가 섬가를 껴안습니다" → 표시 이름이 있으면 그 이름으로) 긴 닉네임부터 치환해
+  // 짧은 닉네임이 긴 닉네임의 일부를 잘못 바꾸는 일을 막아요.
+  function applyDisplayNames(text) {
+    let result = text;
+    const subs = characters
+      .map(c => ({ nick: normalizeNick(c.nickname), disp: (c.displayName || '').trim() }))
+      .filter(s => s.nick && s.disp && s.nick !== s.disp)
+      .sort((a, b) => b.nick.length - a.nick.length);
+    for (const s of subs) {
+      result = result.split(s.nick).join(s.disp);
+    }
+    return result;
+  }
+
   /* ---------- 캐릭터 CRUD ---------- */
 
   function addCharacter() {
@@ -467,7 +482,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
     const msg = document.createElement('span');
     msg.className = 'log-emote-msg';
-    msg.innerHTML = escapeHtml(entry.message).replace(/\n/g, '<br>');
+    msg.innerHTML = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
     inner.appendChild(msg);
 
     if (entry.time) {
@@ -743,10 +758,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         avatarHtml = '<span style="margin-right:6px;">' + escapeHtml(char.avatarValue || '＃') + '</span>';
       }
       const t = timeLabel ? ' <span style="font-style:normal;font-size:11px;opacity:0.65;">' + escapeHtml(timeLabel) + '</span>' : '';
+      const emoteHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
       return (
         '<div style="text-align:center;margin:8px 0;font-family:\'Malgun Gothic\',\'Noto Sans KR\',sans-serif;">' +
           '<span style="display:inline-block;background:' + bg + ';color:' + color + ';border-radius:999px;padding:7px 16px;font-style:italic;font-size:14px;">' +
-            avatarHtml + messageHtml + t +
+            avatarHtml + emoteHtml + t +
           '</span>' +
         '</div>'
       );
@@ -798,7 +814,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
 
     // 감정표현은 본문에 행위자가 들어있고, 시스템은 이름·채널 라벨이 불필요해요.
-    if (isSystem || isEmote) {
+    if (isEmote) {
+      return timeLabel + applyDisplayNames(entry.message);
+    }
+    if (isSystem) {
       return timeLabel + entry.message;
     }
 
