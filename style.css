@@ -56,8 +56,8 @@
   }
 
   .crest {
-    width: 40px;
-    height: 40px;
+    width: 52px;
+    height: 52px;
     flex-shrink: 0;
     background: linear-gradient(135deg, var(--gold) 0%, var(--gold-deep) 45%, var(--cyan) 100%);
     transform: rotate(45deg);
@@ -72,7 +72,7 @@
   .crest::after {
     content: '';
     position: absolute;
-    inset: 11px;
+    inset: 15px;
     border-radius: 2px;
     background: rgba(255, 255, 255, 0.55);
     box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
