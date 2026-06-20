@@ -898,32 +898,41 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   /* ---------- 미리보기 렌더링 ---------- */
 
-  // 감정표현(/em 등 행위 묘사)은 RP에서 중요하므로, 캐릭터 색을 살린 가운데 정렬 알약으로 강조해요.
+  // 감정표현(나래이션)은 캐릭터 색 알약을 가운데에, 시간은 시스템 로그처럼 오른쪽 끝에 둬요.
   function buildEmoteLineNode(entry, char) {
     const line = document.createElement('div');
     line.className = 'log-line is-emote';
 
-    const inner = document.createElement('div');
-    inner.className = 'log-emote';
-    if (char) {
-      inner.style.background = char.bg;
-      inner.style.color = char.color;
-    }
+    const row = document.createElement('div');
+    row.className = 'log-emote-line';
 
-    // 감정표현은 나래이션이라 아바타(프로필 사진)를 붙이지 않아요.
+    const leftSpacer = document.createElement('span');
+    leftSpacer.className = 'log-system-spacer';
+    row.appendChild(leftSpacer);
+
+    const pill = document.createElement('span');
+    pill.className = 'log-emote';
+    if (char) {
+      pill.style.background = char.bg;
+      pill.style.color = char.color;
+    }
     const msg = document.createElement('span');
     msg.className = 'log-emote-msg';
     msg.innerHTML = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
-    inner.appendChild(msg);
+    pill.appendChild(msg);
+    row.appendChild(pill);
 
+    const timeWrap = document.createElement('span');
+    timeWrap.className = 'log-system-timewrap';
     if (entry.time && shouldShowTime()) {
       const t = document.createElement('span');
       t.className = 'log-emote-time';
       t.textContent = entry.time;
-      inner.appendChild(t);
+      timeWrap.appendChild(t);
     }
+    row.appendChild(timeWrap);
 
-    line.appendChild(inner);
+    line.appendChild(row);
     return line;
   }
 
@@ -1528,6 +1537,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   document.getElementById('textCopyBtn').addEventListener('click', copyPlainText);
   document.getElementById('exportFullBtn').addEventListener('click', () => capturePreview(false));
   document.getElementById('exportViewBtn').addEventListener('click', () => capturePreview(true));
+  document.getElementById('resetPreviewSize').addEventListener('click', () => {
+    const p = document.getElementById('preview');
+    p.style.width = '';
+    p.style.height = ''; // CSS 기본값(높이 480px, 가로 자동)으로 복귀
+  });
 
   const logBgColorInput = document.getElementById('logBgColor');
   logBgColorInput.value = settings.bgColor;

@@ -681,6 +681,26 @@
   }
 
   /* ---------- 미리보기 ---------- */
+  .preview-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 12px;
+  }
+
+  .preview-toolbar button {
+    background: transparent;
+    border: 1px solid var(--border-soft);
+    color: var(--text-secondary);
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: border-color 0.2s var(--ease), color 0.2s var(--ease);
+  }
+
+  .preview-toolbar button:hover { border-color: var(--cyan); color: var(--cyan); }
+
   .preview-frame {
     position: relative;
     border: 1px solid var(--border-glow);
@@ -797,14 +817,21 @@
     word-break: break-word;
   }
 
-  /* 감정표현(RP 행위 묘사) — 캐릭터 색을 살린 가운데 정렬 알약으로 강조 */
-  .log-line.is-emote { justify-content: center; }
+  /* 감정표현(나래이션) — 알약은 가운데, 시간은 오른쪽 끝(시스템과 동일) */
+  .log-line.is-emote { display: block; }
+
+  .log-emote-line {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 0 12px;
+    gap: 7px;
+  }
 
   .log-emote {
     display: inline-flex;
     align-items: center;
-    gap: 9px;
-    max-width: 92%;
+    max-width: 100%;
     padding: 9px 16px;
     border-radius: 999px;
     background: var(--panel-raised);
@@ -814,28 +841,13 @@
     box-shadow: 0 2px 14px rgba(0, 0, 0, 0.28);
   }
 
-  .log-emote-avatar {
-    flex-shrink: 0;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    overflow: hidden;
-    background: rgba(0, 0, 0, 0.18);
-  }
-
-  .log-emote-avatar img { width: 100%; height: 100%; object-fit: cover; }
-
   .log-emote-msg { font-weight: 500; word-break: break-word; }
 
   .log-emote-time {
-    flex-shrink: 0;
     font-style: normal;
     font-size: 11px;
-    opacity: 0.65;
+    opacity: 0.6;
+    color: var(--text-secondary);
   }
 
   /* 귓속말 — 사적으로 소근거리는 느낌. 캐릭터 색을 살짝 어둡게(그림자처럼)해 구분, 메시지는 이탤릭. */
@@ -853,13 +865,15 @@
     opacity: 0.7;
   }
 
-  /* 시스템 알림 — 본문은 가운데, 시간은 오른쪽 끝(다른 로그와 통일) */
+  /* 시스템 알림 — 본문은 가운데, 시간은 오른쪽 끝(일반 말풍선 시간과 같은 위치에 맞춤) */
+  .log-line.is-system { display: block; }
+
   .log-system {
     display: flex;
     align-items: baseline;
     gap: 7px;
     width: 100%;
-    padding: 1px 0;
+    padding: 1px 12px; /* 오른쪽 12px = 말풍선 안쪽 여백과 같게 맞춰 시간 정렬 통일 */
     font-size: 12px;
     line-height: 1.55;
   }
