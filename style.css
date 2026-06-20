@@ -360,7 +360,7 @@
     gap: 5px;
   }
 
-  .char-fields input[type="text"] {
+  .char-fields input[type="text"]:not(.hex-input) {
     width: 100%;
     background: var(--panel);
     border: 1px solid var(--border-soft);
@@ -372,17 +372,23 @@
     transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
   }
 
-  .char-fields input[type="text"]::placeholder {
+  .char-fields input[type="text"]:not(.hex-input)::placeholder {
     color: var(--text-secondary);
   }
 
-  /* 배경/글씨 + 내캐릭터/출력을 2열 격자로 정렬 (배경↔내캐릭터, 글씨↔출력) */
-  .char-meta-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px 8px;
+  /* 배경/글씨 색 줄 (색 선택기 + 색상코드 입력칸) */
+  .color-line {
+    display: flex;
     align-items: center;
-    margin-top: 6px;
+    gap: 7px;
+    margin-top: 5px;
+  }
+
+  .toggle-line {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    margin-top: 7px;
   }
 
   .color-label {
@@ -392,6 +398,7 @@
     font-size: 11px;
     white-space: nowrap;
     color: var(--text-secondary);
+    flex-shrink: 0;
   }
 
   .color-label input[type="color"] {
@@ -403,6 +410,21 @@
     background: none;
     cursor: pointer;
   }
+
+  /* 색상코드(#RRGGBB) 입력칸 */
+  .hex-input {
+    width: 74px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border: 1px solid var(--border-soft);
+    border-radius: 5px;
+    padding: 4px 6px;
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 11px;
+  }
+
+  .hex-input::placeholder { color: var(--text-secondary); }
 
   .me-check {
     display: flex;
@@ -512,7 +534,8 @@
   .bg-color-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    flex-wrap: wrap;
+    gap: 8px;
     margin-top: 12px;
     font-size: 13px;
     color: var(--text-secondary);
@@ -815,18 +838,14 @@
     opacity: 0.65;
   }
 
-  /* 귓속말 — 사적으로 소근거리는 느낌(반투명·이탤릭). 보낸·받은 것 모두 왼쪽 정렬. */
+  /* 귓속말 — 사적으로 소근거리는 느낌. 캐릭터 색을 살짝 어둡게(그림자처럼)해 구분, 메시지는 이탤릭. */
   .log-line.is-whisper .log-bubble {
     border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow: none;
   }
 
-  /* 아바타(프로필 사진)도 말풍선과 같은 투명도로 함께 흐리게 */
-  .log-line.is-whisper .log-avatar { opacity: 0.72; }
-
   .log-line.is-whisper .log-message {
     font-style: italic;
-    opacity: 0.92;
   }
 
   .log-whisper-tag {
@@ -834,41 +853,46 @@
     opacity: 0.7;
   }
 
-  /* 시스템 알림 — 이름 라벨 없이 가운데 정렬된 조용한 한 줄 */
-  .log-line.is-system { justify-content: center; }
-
+  /* 시스템 알림 — 본문은 가운데, 시간은 오른쪽 끝(다른 로그와 통일) */
   .log-system {
-    display: inline-flex;
+    display: flex;
     align-items: baseline;
-    flex-wrap: wrap;
-    justify-content: center;
     gap: 7px;
-    max-width: 90%;
+    width: 100%;
     padding: 1px 0;
     font-size: 12px;
-    color: var(--text-secondary);
-    text-align: center;
     line-height: 1.55;
   }
 
-  .log-system-time {
+  .log-system-spacer { flex: 1 1 0; }
+
+  .log-system-timewrap {
+    flex: 1 1 0;
+    text-align: right;
     flex-shrink: 0;
+  }
+
+  .log-system-center {
+    text-align: center;
+    word-break: break-word;
+  }
+
+  .log-system-time {
     font-size: 11px;
-    opacity: 0.55;
+    opacity: 0.7;
   }
 
   .log-system-tag {
-    flex-shrink: 0;
     font-size: 10.5px;
     color: var(--gold-deep);
     border: 1px solid var(--border-soft);
     border-radius: 4px;
     padding: 0 5px;
+    margin-right: 5px;
   }
 
   .log-system-msg {
-    opacity: 0.85;
-    word-break: break-word;
+    opacity: 0.9;
   }
 
   /* ---------- 사진 크롭 편집기 ---------- */

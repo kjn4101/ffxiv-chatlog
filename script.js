@@ -28,6 +28,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   /* ---------- 표시 설정 (로그 배경색 등) ---------- */
   const SETTINGS_KEY = 'ffxiv_echo_log_settings';
   const DEFAULT_BG = '#161d28';
+  const DEFAULT_SYS_COLOR = '#8a93a6';
 
   function loadSettings() {
     try {
@@ -40,6 +41,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   let settings = loadSettings();
   if (!settings.bgColor) settings.bgColor = DEFAULT_BG;
+  if (!settings.sysColor) settings.sysColor = DEFAULT_SYS_COLOR;
 
   function saveSettings() {
     try {
@@ -310,13 +312,38 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return findCharacterByNickname(entry.nickname);
   }
 
-  function hexToRgba(hex, alpha) {
+  // 색 선택기(<input type=color>) 옆에 붙는 색상코드(#RRGGBB) 입력칸을 만들어 서로 동기화해요.
+  function linkHexInput(colorInput) {
+    const tx = document.createElement('input');
+    tx.type = 'text';
+    tx.className = 'hex-input';
+    tx.maxLength = 7;
+    tx.spellcheck = false;
+    tx.placeholder = '#RRGGBB';
+    tx.value = colorInput.value;
+    tx.addEventListener('input', () => {
+      let v = tx.value.trim();
+      if (v && v[0] !== '#') v = '#' + v;
+      if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+        colorInput.value = v;
+        colorInput.dispatchEvent(new Event('input', { bubbles: true })); // 색 선택기의 기존 처리도 실행
+      }
+    });
+    colorInput.addEventListener('input', () => {
+      if (tx.value.toLowerCase() !== colorInput.value.toLowerCase()) tx.value = colorInput.value;
+    });
+    return tx;
+  }
+
+  // 색을 검정 쪽으로 ratio만큼 섞어 살짝 어둡게(그림자 씌운 느낌). 투명도와 달리 배경색에 영향받지 않아요.
+  function darkenHex(hex, ratio) {
     const h = (hex || '').replace('#', '');
-    if (h.length !== 6) return hex;
-    const r = parseInt(h.slice(0, 2), 16);
-    const g = parseInt(h.slice(2, 4), 16);
-    const b = parseInt(h.slice(4, 6), 16);
-    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
+    if (h.length !== 6) return hex || '#1c232e';
+    const f = 1 - ratio;
+    const r = Math.round(parseInt(h.slice(0, 2), 16) * f);
+    const g = Math.round(parseInt(h.slice(2, 4), 16) * f);
+    const b = Math.round(parseInt(h.slice(4, 6), 16) * f);
+    return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
   }
 
   // 감정표현 문장 안에 등장하는 등록된 닉네임을, 표시 이름이 지정돼 있으면 그 이름으로 바꿔요.
@@ -515,7 +542,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
       const dispInput = document.createElement('input');
       dispInput.type = 'text';
-      dispInput.placeholder = '표시 이름 (선택, 비우면 닉네임 표시)';
+      dispInput.placeholder = '표시 이름 (공란 시 닉네임)';
       dispInput.value = c.displayName;
       dispInput.addEventListener('input', () => {
         updateCharacter(c.id, { displayName: dispInput.value });
@@ -583,14 +610,25 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       outLabel.appendChild(outInput);
       outLabel.appendChild(document.createTextNode(' 출력에 표시'));
 
-      // 배경/글씨 + 내캐릭터/출력을 2열 격자로 가지런히 정렬 (배경↔내캐릭터, 글씨↔출력 정렬)
-      const metaGrid = document.createElement('div');
-      metaGrid.className = 'char-meta-grid';
-      metaGrid.appendChild(bgLabel);
-      metaGrid.appendChild(colorLabel);
-      metaGrid.appendChild(meLabel);
-      metaGrid.appendChild(outLabel);
-      fields.appendChild(metaGrid);
+      // 배경/글씨: 색 선택기 + 색상코드(#RRGGBB) 입력칸을 각 줄에
+      const bgLine = document.createElement('div');
+      bgLine.className = 'color-line';
+      bgLine.appendChild(bgLabel);
+      bgLine.appendChild(linkHexInput(bgInput));
+      fields.appendChild(bgLine);
+
+      const colorLine = document.createElement('div');
+      colorLine.className = 'color-line';
+      colorLine.appendChild(colorLabel);
+      colorLine.appendChild(linkHexInput(colorInput));
+      fields.appendChild(colorLine);
+
+      // 내 캐릭터 / 출력에 표시
+      const toggleLine = document.createElement('div');
+      toggleLine.className = 'toggle-line';
+      toggleLine.appendChild(meLabel);
+      toggleLine.appendChild(outLabel);
+      fields.appendChild(toggleLine);
 
       if (hiddenOutputIds.has(c.id)) row.classList.add('char-hidden');
 
@@ -916,7 +954,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
     const bubble = document.createElement('div');
     bubble.className = 'log-bubble';
-    bubble.style.background = char ? hexToRgba(char.bg, 0.72) : 'rgba(36, 44, 57, 0.72)';
+    bubble.style.background = char ? darkenHex(char.bg, 0.22) : '#1c232e';
     bubble.style.color = char ? char.color : 'var(--text-primary)';
 
     const meta = document.createElement('div');
@@ -960,23 +998,36 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
     const inner = document.createElement('div');
     inner.className = 'log-system';
+    inner.style.color = settings.sysColor;
 
-    if (entry.time && shouldShowTime()) {
-      const t = document.createElement('span');
-      t.className = 'log-system-time';
-      t.textContent = entry.time;
-      inner.appendChild(t);
-    }
+    // 좌우 spacer를 같은 너비(flex:1)로 둬서 가운데 내용은 중앙에, 시간은 오른쪽 끝에 정렬돼요.
+    const leftSpacer = document.createElement('span');
+    leftSpacer.className = 'log-system-spacer';
+    inner.appendChild(leftSpacer);
+
+    const center = document.createElement('span');
+    center.className = 'log-system-center';
     if (entry.channel && entry.channelType === 'system') {
       const tag = document.createElement('span');
       tag.className = 'log-system-tag';
       tag.textContent = entry.channel;
-      inner.appendChild(tag);
+      center.appendChild(tag);
     }
     const msg = document.createElement('span');
     msg.className = 'log-system-msg';
     msg.innerHTML = escapeHtml(entry.message).replace(/\n/g, '<br>');
-    inner.appendChild(msg);
+    center.appendChild(msg);
+    inner.appendChild(center);
+
+    const timeWrap = document.createElement('span');
+    timeWrap.className = 'log-system-timewrap';
+    if (entry.time && shouldShowTime()) {
+      const t = document.createElement('span');
+      t.className = 'log-system-time';
+      t.textContent = entry.time;
+      timeWrap.appendChild(t);
+    }
+    inner.appendChild(timeWrap);
 
     line.appendChild(inner);
     return line;
@@ -1170,11 +1221,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const timeLabel = (entry.time && shouldShowTime()) ? entry.time : '';
     const metaStyle = 'color:#999;font-size:12px;';
 
-    // 시스템 알림: 가운데 정렬 회색 한 줄
+    // 시스템 알림: 가운데 정렬, 시간은 뒤(오른쪽)에. 색은 설정값.
     if (isSystem) {
-      const bits = [timeLabel, (entry.channel && entry.channelType === 'system') ? entry.channel : ''].filter(Boolean).join(' · ');
-      const prefix = bits ? escapeHtml(bits) + '  ' : '';
-      return copyCenterRow(prefix + messageHtml, 'color:#999;font-size:12px;');
+      const tag = (entry.channel && entry.channelType === 'system') ? escapeHtml(entry.channel) + ' · ' : '';
+      const t = timeLabel ? '  <span style="opacity:0.7;font-size:11px;">' + escapeHtml(timeLabel) + '</span>' : '';
+      return copyCenterRow(tag + messageHtml + t, 'color:' + settings.sysColor + ';font-size:12px;');
     }
 
     // 감정표현: 가운데 정렬 이탤릭 (나래이션이라 아바타·이름 없이 본문만)
@@ -1237,12 +1288,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const time = (entry.time && shouldShowTime()) ? entry.time : '';
     const msgHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
 
-    // 시스템 알림
+    // 시스템 알림 (시간은 뒤=오른쪽, 색은 설정값)
     if (isSystem) {
-      const t = time ? '<span style="font-size:11px;opacity:0.55;margin-right:6px;">' + escapeHtml(time) + '</span>' : '';
+      const t = time ? ' <span style="font-size:11px;opacity:0.7;margin-left:6px;">' + escapeHtml(time) + '</span>' : '';
       const tag = (entry.channel && entry.channelType === 'system')
         ? '<span style="font-size:10.5px;color:#a8843f;border:1px solid #2c3648;border-radius:4px;padding:0 5px;margin-right:6px;">' + escapeHtml(entry.channel) + '</span>' : '';
-      return '<div style="text-align:center;color:#8a93a6;font-size:12px;margin-bottom:10px;">' + t + tag + msgHtml + '</div>';
+      return '<div style="text-align:center;color:' + settings.sysColor + ';font-size:12px;margin-bottom:10px;">' + tag + msgHtml + t + '</div>';
     }
 
     // 감정표현 (나래이션이라 아바타 없이 본문만)
@@ -1261,7 +1312,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     if (isWhisper) {
       const isOut = entry.channelType === 'whisper-out';
       const wChar = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
-      const bg = wChar ? hexToRgba(wChar.bg, 0.72) : 'rgba(36, 44, 57, 0.72)';
+      const bg = wChar ? darkenHex(wChar.bg, 0.22) : '#1c232e';
       const color = wChar ? wChar.color : '#e9e4d6';
       const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
       const meta = ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), time].filter(Boolean).join(' ');
@@ -1485,11 +1536,31 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     saveSettings();
     applyLogBackground();
   });
+  const logBgHex = linkHexInput(logBgColorInput);
+  logBgColorInput.insertAdjacentElement('afterend', logBgHex);
   document.getElementById('logBgReset').addEventListener('click', () => {
     settings.bgColor = DEFAULT_BG;
     logBgColorInput.value = DEFAULT_BG;
+    logBgHex.value = DEFAULT_BG;
     saveSettings();
     applyLogBackground();
+  });
+
+  const sysColorInput = document.getElementById('sysColor');
+  sysColorInput.value = settings.sysColor;
+  sysColorInput.addEventListener('input', () => {
+    settings.sysColor = sysColorInput.value;
+    saveSettings();
+    renderPreview();
+  });
+  const sysColorHex = linkHexInput(sysColorInput);
+  sysColorInput.insertAdjacentElement('afterend', sysColorHex);
+  document.getElementById('sysColorReset').addEventListener('click', () => {
+    settings.sysColor = DEFAULT_SYS_COLOR;
+    sysColorInput.value = DEFAULT_SYS_COLOR;
+    sysColorHex.value = DEFAULT_SYS_COLOR;
+    saveSettings();
+    renderPreview();
   });
 
   // 캐릭터 검색
