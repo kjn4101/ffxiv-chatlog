@@ -813,7 +813,7 @@
 
   /* 귓속말 — 사적으로 소근거리는 느낌(반투명·이탤릭). 보낸·받은 것 모두 왼쪽 정렬. */
   .log-line.is-whisper .log-bubble {
-    border: 1px dashed rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow: none;
   }
 

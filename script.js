@@ -1190,7 +1190,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   }
 
   function richRowHtml(av, bg, color, header, body, dashed) {
-    const border = dashed ? 'border:1px dashed rgba(255,255,255,0.2);' : '';
+    const border = dashed ? 'border:1px solid rgba(255,255,255,0.14);' : '';
     return '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">' +
       av +
       '<div style="flex:1;border-radius:10px;padding:9px 12px;background:' + bg + ';color:' + color + ';' + border + '">' +
