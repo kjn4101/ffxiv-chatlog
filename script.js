@@ -1202,19 +1202,33 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return '<img src="' + url + '" width="36" height="36" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;">';
   }
 
-  // [색 줄][아바타][이름·메시지] 3칸 행. 색 줄은 캐릭터 배경색이라, 사진을 넣어도 캐릭터 색이 남아요.
-  function copyMsgRow(barColor, avatarHtml, headerHtml, bodyHtml, italic) {
+  // 오른쪽 끝 시간 칸 (시간 표시 켜진 경우에만)
+  function copyTimeCell(timeHtml) {
+    return '<td width="46" valign="top" style="width:46px;border:none;padding:3px 4px 0 4px;text-align:right;color:#999;font-size:11px;white-space:nowrap;">' + (timeHtml || '') + '</td>';
+  }
+
+  // [색 줄][아바타][이름·메시지]( [시간] ) 행. 색 줄은 캐릭터 배경색이라 사진을 넣어도 캐릭터 색이 남아요.
+  function copyMsgRow(barColor, avatarHtml, headerHtml, bodyHtml, italic, timeHtml) {
     return '<tr>' +
       '<td width="3" style="width:3px;background:' + barColor + ';border:none;padding:0;font-size:1px;line-height:1px;">&nbsp;</td>' +
       '<td width="46" valign="top" style="width:46px;border:none;padding:3px 0 0 6px;text-align:center;">' + avatarHtml + '</td>' +
       '<td valign="top" style="border:none;padding:2px 0 12px 10px;' + COPY_FONT + '">' +
         '<div style="font-size:14px;line-height:1.5;">' + headerHtml + '</div>' +
         '<div style="font-size:14px;line-height:1.55;color:#222;' + (italic ? 'font-style:italic;' : '') + '">' + bodyHtml + '</div>' +
-      '</td></tr>';
+      '</td>' +
+      (shouldShowTime() ? copyTimeCell(timeHtml) : '') +
+    '</tr>';
   }
 
-  // 가운데 정렬 행 (시스템/감정표현) — 세 칸을 합쳐 가운데로
-  function copyCenterRow(innerHtml, extraStyle) {
+  // 가운데 정렬 행 (시스템/감정표현). 시간 표시 시: [빈칸][가운데][시간]으로 좌우 대칭을 맞춰 가운데 유지.
+  function copyCenterRow(innerHtml, extraStyle, timeHtml, timeColor) {
+    if (shouldShowTime()) {
+      return '<tr>' +
+        '<td colspan="2" style="border:none;padding:0;"></td>' +
+        '<td style="border:none;padding:4px 0;text-align:center;' + COPY_FONT + (extraStyle || '') + '">' + innerHtml + '</td>' +
+        '<td width="46" valign="top" style="width:46px;border:none;padding:4px 4px 0 4px;text-align:right;font-size:11px;color:' + (timeColor || '#999') + ';white-space:nowrap;">' + (timeHtml || '') + '</td>' +
+      '</tr>';
+    }
     return '<tr>' +
       '<td colspan="3" style="border:none;padding:4px 0;text-align:center;' + COPY_FONT + (extraStyle || '') + '">' + innerHtml + '</td>' +
     '</tr>';
@@ -1228,39 +1242,38 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const isSystem = !entry.nickname && !isWhisper;
     const messageHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
     const timeLabel = (entry.time && shouldShowTime()) ? entry.time : '';
+    const timeHtml = timeLabel ? escapeHtml(timeLabel) : '';
     const metaStyle = 'color:#999;font-size:12px;';
 
-    // 시스템 알림: 가운데 정렬, 시간은 뒤(오른쪽)에. 색은 설정값.
+    // 시스템 알림: 가운데 정렬, 시간은 오른쪽 칸. 색은 설정값.
     if (isSystem) {
       const tag = (entry.channel && entry.channelType === 'system') ? escapeHtml(entry.channel) + ' · ' : '';
-      const t = timeLabel ? '  <span style="opacity:0.7;font-size:11px;">' + escapeHtml(timeLabel) + '</span>' : '';
-      return copyCenterRow(tag + messageHtml + t, 'color:' + settings.sysColor + ';font-size:12px;');
+      return copyCenterRow(tag + messageHtml, 'color:' + settings.sysColor + ';font-size:12px;', timeHtml, settings.sysColor);
     }
 
-    // 감정표현: 가운데 정렬 이탤릭 (나래이션이라 아바타·이름 없이 본문만)
+    // 감정표현: 가운데 정렬 이탤릭, 시간은 오른쪽 칸 (나래이션이라 아바타·이름 없이 본문만)
     if (isEmote) {
-      const t = timeLabel ? ' <span style="' + metaStyle + 'font-style:normal;">' + escapeHtml(timeLabel) + '</span>' : '';
       const emoteHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
-      return copyCenterRow(emoteHtml + t, 'font-style:italic;font-size:14px;color:#333;');
+      return copyCenterRow(emoteHtml, 'font-style:italic;font-size:14px;color:#333;', timeHtml);
     }
 
-    // 귓속말: 아바타 + 이름(굵게) + "→ 상대 · 귓속말", 메시지는 이탤릭
+    // 귓속말: 아바타 + 이름(굵게) + "→ 상대 · 귓속말", 메시지는 이탤릭, 시간은 오른쪽 칸
     if (isWhisper) {
       const isOut = entry.channelType === 'whisper-out';
       const wChar = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
       const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
-      const meta = ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), '귓속말', timeLabel].filter(Boolean).join(' · ');
+      const meta = ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), '귓속말'].filter(Boolean).join(' · ');
       const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b> <span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>';
       const fallback = isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?');
-      return copyMsgRow(wChar ? wChar.bg : '#cccccc', copyAvatarCellHtml(wChar, fallback), header, messageHtml, true);
+      return copyMsgRow(wChar ? wChar.bg : '#cccccc', copyAvatarCellHtml(wChar, fallback), header, messageHtml, true, timeHtml);
     }
 
-    // 일반 대화: 색 줄 + 아바타 + 이름(굵게)
+    // 일반 대화: 색 줄 + 아바타 + 이름(굵게), 시간은 오른쪽 칸
     const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
-    const metaBits = [(entry.channel && shouldShowChannel()) ? '[' + entry.channel + ']' : '', timeLabel].filter(Boolean).join(' ');
+    const channelLabel = (entry.channel && shouldShowChannel()) ? '[' + entry.channel + ']' : '';
     const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' +
-      (metaBits ? ' <span style="' + metaStyle + '">' + escapeHtml(metaBits) + '</span>' : '');
-    return copyMsgRow(char ? char.bg : '#cccccc', copyAvatarCellHtml(char, (entry.nickname || '?').charAt(0) || '?'), header, messageHtml, false);
+      (channelLabel ? ' <span style="' + metaStyle + '">' + escapeHtml(channelLabel) + '</span>' : '');
+    return copyMsgRow(char ? char.bg : '#cccccc', copyAvatarCellHtml(char, (entry.nickname || '?').charAt(0) || '?'), header, messageHtml, false, timeHtml);
   }
 
   /* ---------- HTML 코드 복사용 (티스토리 등 HTML 편집 모드) ----------
@@ -1388,9 +1401,13 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
 
     // 메시지 행들을 표 하나로 감싸요 (메시지마다 표를 따로 만들면 에디터가 사이에 빈 줄을 넣어요).
-    // 가로 100%로 늘려 감정표현·시스템 행이 페이지 중앙에 오게 하고, colgroup으로 아바타 칸 폭을 고정해요.
+    // 가로 100%로 늘려 감정표현·시스템 행이 페이지 중앙에 오게 하고, colgroup으로 칸 폭을 고정해요.
+    // 시간 표시가 켜져 있으면 맨 오른쪽에 시간 칸(46px)을 추가해 시간을 우측 정렬해요.
+    const colgroup = shouldShowTime()
+      ? '<colgroup><col style="width:3px;"><col style="width:46px;"><col><col style="width:46px;"></colgroup>'
+      : '<colgroup><col style="width:3px;"><col style="width:46px;"><col></colgroup>';
     const htmlContent = '<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:none;width:100%;table-layout:fixed;' + COPY_FONT + '">' +
-      '<colgroup><col style="width:3px;"><col style="width:46px;"><col></colgroup><tbody>' +
+      colgroup + '<tbody>' +
       filtered.map(buildLineHtml).join('') + '</tbody></table>';
     const plainText = filtered.map(buildPlainText).join('\n');
 
