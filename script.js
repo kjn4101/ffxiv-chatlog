@@ -107,14 +107,20 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     });
   }
 
-  const AVATAR_THUMB_SIZE = 40;
+  // 서식 복사용 아바타 크기(px). 별도 사진 칸에 들어가므로 줄을 망가뜨리지 않고, 에디터가 width
+  // 지정을 무시해도 이 원본 크기로 또렷하게 보여요.
+  const AVATAR_THUMB_SIZE = 36;
+  const AVATAR_THUMB_VERSION = 3; // 썸네일 규격이 바뀌면 숫자를 올려 기존 썸네일을 다시 만들게 해요.
 
-  // 예전에 등록한 이미지 아바타에 썸네일이 없으면 만들어 둬요 (다음 서식 복사부터 작게 나옴).
+  // 썸네일이 없거나 규격이 옛날이면 다시 만들어 둬요 (다음 서식 복사부터 작게 나옴).
   function ensureAvatarThumbs() {
-    const need = characters.filter(c => c.avatarType === 'image' && c.avatarValue && !c.avatarThumb);
+    const need = characters.filter(c => c.avatarType === 'image' && c.avatarValue &&
+      (!c.avatarThumb || c.avatarThumbV !== AVATAR_THUMB_VERSION));
     if (need.length === 0) return;
-    Promise.all(need.map(c => downscaleDataUrl(c.avatarValue, AVATAR_THUMB_SIZE).then(t => { c.avatarThumb = t; })))
-      .then(() => saveCharacters());
+    Promise.all(need.map(c => downscaleDataUrl(c.avatarValue, AVATAR_THUMB_SIZE).then(t => {
+      c.avatarThumb = t;
+      c.avatarThumbV = AVATAR_THUMB_VERSION;
+    }))).then(() => saveCharacters());
   }
 
   /* ---------- 사진 크롭 편집기 (드래그 + 확대) ----------
@@ -437,7 +443,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
           const result = await openCropEditor(file);
           fileInput.value = ''; // 같은 파일 다시 올릴 수 있게 초기화
           if (!result) return;  // 취소
-          updateCharacter(c.id, { avatarType: 'image', avatarValue: result.full, avatarThumb: result.thumb });
+          updateCharacter(c.id, { avatarType: 'image', avatarValue: result.full, avatarThumb: result.thumb, avatarThumbV: AVATAR_THUMB_VERSION });
           refreshAvatarPreview();
           renderPreview();
         } catch (e) {
@@ -1032,37 +1038,34 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
      강조하고, 메시지는 그 아래 일반 텍스트로. 어떤 에디터에 붙여도 깔끔하게 읽혀요. */
   const COPY_FONT = "font-family:'Malgun Gothic','Noto Sans KR',sans-serif;";
 
-  function copyAvatarInline(char) {
-    // 이름 앞에 붙는 작은 아바타. 비어있으면 생략해 깔끔하게.
-    // 이미지는 작은 썸네일을 써요(에디터가 크기 지정을 무시해도 작게 나오도록). 썸네일이 아직
-    // 없으면(예전 데이터) 이미지를 생략해 서식이 깨지지 않게 합니다.
-    if (char && char.avatarType === 'image') {
-      if (char.avatarThumb) {
-        return '<img src="' + char.avatarThumb + '" width="18" height="18" style="width:18px;height:18px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:5px;">';
-      }
-      return '';
+  // 사진 칸 아바타 = 미리보기와 같은 '색 동그라미'(에디터에선 둥근모서리가 빠져 색 사각형으로 보일 수 있음).
+  // 이미지면 사진, 이모지/글씨가 있으면 그 위에, 둘 다 없으면 캐릭터 배경색만. 등록 안 된 사람만 첫 글자.
+  function copyAvatarCellHtml(char, fallbackText) {
+    if (char && char.avatarType === 'image' && char.avatarThumb) {
+      return '<img src="' + char.avatarThumb + '" width="36" height="36" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;">';
     }
-    if (char && char.avatarValue) {
-      return '<span style="vertical-align:middle;margin-right:4px;">' + escapeHtml(char.avatarValue) + '</span>';
-    }
-    return '';
+    const bg = char ? char.bg : '#3a4252';
+    const color = char ? char.color : '#cfd6e4';
+    const inner = (char && char.avatarType !== 'image' && char.avatarValue)
+      ? escapeHtml(char.avatarValue)
+      : (char ? '' : escapeHtml(fallbackText || '?'));
+    return '<span style="display:inline-block;width:36px;height:36px;line-height:36px;border-radius:50%;background:' + bg + ';color:' + color + ';text-align:center;font-size:17px;font-weight:700;vertical-align:middle;overflow:hidden;">' + inner + '</span>';
   }
 
-  // 왼쪽 얇은 색 줄 = 폭 좁은 '색칠된 셀'. 이름은 칩 없이 굵은 글씨, 메시지는 일반 텍스트.
-  function copyBarRow(barColor, headerHtml, bodyHtml, italic) {
+  // [아바타][이름·메시지] 2칸 행. 색 동그라미 아바타가 캐릭터 색을 나타내요(왼쪽 색 줄은 안 씀).
+  function copyMsgRow(avatarHtml, headerHtml, bodyHtml, italic) {
     return '<tr>' +
-      '<td width="4" style="width:4px;background:' + barColor + ';border:none;padding:0;font-size:1px;line-height:1px;">&nbsp;</td>' +
-      '<td style="border:none;padding:3px 0 11px 11px;' + COPY_FONT + '">' +
+      '<td width="44" valign="top" style="width:44px;border:none;padding:3px 0 0 0;text-align:center;">' + avatarHtml + '</td>' +
+      '<td valign="top" style="border:none;padding:2px 0 12px 10px;' + COPY_FONT + '">' +
         '<div style="font-size:14px;line-height:1.5;">' + headerHtml + '</div>' +
         '<div style="font-size:14px;line-height:1.55;color:#222;' + (italic ? 'font-style:italic;' : '') + '">' + bodyHtml + '</div>' +
       '</td></tr>';
   }
 
-  // 가운데 정렬 행 (시스템/감정표현) — 왼쪽 줄 없음
+  // 가운데 정렬 행 (시스템/감정표현) — 두 칸을 합쳐 가운데로
   function copyCenterRow(innerHtml, extraStyle) {
     return '<tr>' +
-      '<td style="border:none;padding:0;"></td>' +
-      '<td style="border:none;padding:4px 0;text-align:center;' + COPY_FONT + (extraStyle || '') + '">' + innerHtml + '</td>' +
+      '<td colspan="2" style="border:none;padding:4px 0;text-align:center;' + COPY_FONT + (extraStyle || '') + '">' + innerHtml + '</td>' +
     '</tr>';
   }
 
@@ -1090,26 +1093,23 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return copyCenterRow(emoteHtml + t, 'font-style:italic;font-size:14px;color:#333;');
     }
 
-    // 귓속말: 왼쪽 색 줄 + 이름(굵게) + "→ 상대 · 귓속말", 메시지는 이탤릭
+    // 귓속말: 아바타 + 이름(굵게) + "→ 상대 · 귓속말", 메시지는 이탤릭
     if (isWhisper) {
       const isOut = entry.channelType === 'whisper-out';
       const wChar = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
-      const bar = wChar ? wChar.bg : '#cccccc';
       const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
       const meta = ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), '귓속말', timeLabel].filter(Boolean).join(' · ');
-      const av = copyAvatarInline(wChar);
-      const header = av + '<b style="font-size:14px;">' + escapeHtml(name) + '</b> <span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>';
-      return copyBarRow(bar, header, messageHtml, true);
+      const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b> <span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>';
+      const fallback = isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?');
+      return copyMsgRow(copyAvatarCellHtml(wChar, fallback), header, messageHtml, true);
     }
 
-    // 일반 대화: 왼쪽 색 줄 + 이름(굵게)
-    const bar = char ? char.bg : '#cccccc';
+    // 일반 대화: 아바타 + 이름(굵게)
     const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
     const metaBits = [(entry.channel && shouldShowChannel()) ? '[' + entry.channel + ']' : '', timeLabel].filter(Boolean).join(' ');
-    const av = copyAvatarInline(char);
-    const header = av + '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' +
+    const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' +
       (metaBits ? ' <span style="' + metaStyle + '">' + escapeHtml(metaBits) + '</span>' : '');
-    return copyBarRow(bar, header, messageHtml, false);
+    return copyMsgRow(copyAvatarCellHtml(char, (entry.nickname || '?').charAt(0) || '?'), header, messageHtml, false);
   }
 
   /* ---------- HTML 코드 복사용 (티스토리 등 HTML 편집 모드) ----------
@@ -1237,9 +1237,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
 
     // 메시지 행들을 표 하나로 감싸요 (메시지마다 표를 따로 만들면 에디터가 사이에 빈 줄을 넣어요).
-    // 가로 100%로 늘려 감정표현·시스템 행이 페이지 중앙에 오게 하고, colgroup으로 색 줄 칸은 얇게 고정해요.
+    // 가로 100%로 늘려 감정표현·시스템 행이 페이지 중앙에 오게 하고, colgroup으로 아바타 칸 폭을 고정해요.
     const htmlContent = '<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:none;width:100%;table-layout:fixed;' + COPY_FONT + '">' +
-      '<colgroup><col style="width:5px;"><col></colgroup><tbody>' +
+      '<colgroup><col style="width:44px;"><col></colgroup><tbody>' +
       filtered.map(buildLineHtml).join('') + '</tbody></table>';
     const plainText = filtered.map(buildPlainText).join('\n');
 
