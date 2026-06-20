@@ -1069,22 +1069,52 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   /* ---------- 이미지 내보내기 ---------- */
 
-  function exportImage() {
+  // cropToView=false: 박스 크기와 상관없이 로그 전체를 캡처
+  // cropToView=true: 미리보기 박스에 '보이는 만큼만' 캡처
+  function capturePreview(cropToView) {
     const node = document.getElementById('preview');
     if (!node.children.length || node.querySelector('.empty-notice')) {
-      alert('내보낼 로그가 없습니다. 먼저 변환하기를 눌러주세요.');
+      alert('내보낼 로그가 없습니다. 로그를 붙여넣어 주세요.');
       return;
     }
     if (typeof html2canvas === 'undefined') {
       alert('이미지 저장 기능을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.');
       return;
     }
-    html2canvas(node, { backgroundColor: settings.bgColor, scale: 2 }).then(canvas => {
+
+    const scale = 2;
+    // 보이는 영역 정보(펼치기 전에 기록)
+    const view = { top: node.scrollTop, left: node.scrollLeft, w: node.clientWidth, h: node.clientHeight };
+    // 전체 내용이 다 캡처되도록 잠시 펼쳐요.
+    const prev = { height: node.style.height, maxHeight: node.style.maxHeight, overflow: node.style.overflow };
+    function restore() {
+      node.style.height = prev.height;
+      node.style.maxHeight = prev.maxHeight;
+      node.style.overflow = prev.overflow;
+    }
+    node.style.height = 'auto';
+    node.style.maxHeight = 'none';
+    node.style.overflow = 'visible';
+
+    html2canvas(node, { backgroundColor: settings.bgColor, scale }).then(full => {
+      restore();
+      let out = full;
+      if (cropToView) {
+        out = document.createElement('canvas');
+        out.width = Math.max(1, Math.round(view.w * scale));
+        out.height = Math.max(1, Math.round(view.h * scale));
+        out.getContext('2d').drawImage(
+          full,
+          view.left * scale, view.top * scale, view.w * scale, view.h * scale,
+          0, 0, view.w * scale, view.h * scale
+        );
+      }
       const link = document.createElement('a');
       link.download = 'ffxiv_log_' + Date.now() + '.png';
-      link.href = canvas.toDataURL('image/png');
+      link.href = out.toDataURL('image/png');
       link.click();
     }).catch(err => {
+      restore();
       alert('이미지 저장 중 문제가 발생했습니다: ' + err.message);
     });
   }
@@ -1445,7 +1475,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   document.getElementById('copyBtn').addEventListener('click', copyFormatted);
   document.getElementById('htmlCopyBtn').addEventListener('click', copyHtmlCode);
   document.getElementById('textCopyBtn').addEventListener('click', copyPlainText);
-  document.getElementById('exportBtn').addEventListener('click', exportImage);
+  document.getElementById('exportFullBtn').addEventListener('click', () => capturePreview(false));
+  document.getElementById('exportViewBtn').addEventListener('click', () => capturePreview(true));
 
   const logBgColorInput = document.getElementById('logBgColor');
   logBgColorInput.value = settings.bgColor;

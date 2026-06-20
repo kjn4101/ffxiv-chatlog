@@ -683,9 +683,13 @@
     display: flex;
     flex-direction: column;
     gap: 13px;
-    max-height: 520px;
-    overflow-y: auto;
+    height: 480px;
+    min-height: 140px;
+    min-width: 220px;
+    max-width: 100%;
+    overflow: auto;
     padding-right: 8px;
+    resize: both; /* 오른쪽 아래 모서리를 끌어 가로·세로 크기 조절 */
   }
 
   #preview::-webkit-scrollbar { width: 8px; }
