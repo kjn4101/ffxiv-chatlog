@@ -880,14 +880,25 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return '';
   }
 
-  function copyNameChip(name, bg, color) {
-    return '<span style="background:' + bg + ';color:' + color + ';font-weight:bold;font-size:14px;padding:1px 7px;border-radius:4px;">' + escapeHtml(name) + '</span>';
+  // 왼쪽 얇은 색 줄 = 폭 좁은 '색칠된 셀'. 이름은 칩 없이 굵은 글씨, 메시지는 일반 텍스트.
+  function copyBarRow(barColor, headerHtml, bodyHtml, italic) {
+    return '<tr>' +
+      '<td width="4" style="width:4px;background:' + barColor + ';border:none;padding:0;font-size:1px;line-height:1px;">&nbsp;</td>' +
+      '<td style="border:none;padding:3px 0 11px 11px;' + COPY_FONT + '">' +
+        '<div style="font-size:14px;line-height:1.5;">' + headerHtml + '</div>' +
+        '<div style="font-size:14px;line-height:1.55;color:#222;' + (italic ? 'font-style:italic;' : '') + '">' + bodyHtml + '</div>' +
+      '</td></tr>';
   }
 
-  function copyMessageBlock(html, italic) {
-    return '<div style="margin:2px 0 0 2px;font-size:14px;line-height:1.55;color:#222;' + (italic ? 'font-style:italic;' : '') + '">' + html + '</div>';
+  // 가운데 정렬 행 (시스템/감정표현) — 왼쪽 줄 없음
+  function copyCenterRow(innerHtml, extraStyle) {
+    return '<tr>' +
+      '<td style="border:none;padding:0;"></td>' +
+      '<td style="border:none;padding:4px 0;text-align:center;' + COPY_FONT + (extraStyle || '') + '">' + innerHtml + '</td>' +
+    '</tr>';
   }
 
+  // 메시지 하나를 표의 '행(tr)'으로 만들어요. 전체는 copyFormatted에서 표 하나로 감쌉니다.
   function buildLineHtml(entry) {
     const char = findCharacterByNickname(entry.nickname);
     const isEmote = entry.channelType === 'emote';
@@ -897,46 +908,41 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const timeLabel = (entry.time && shouldShowTime()) ? entry.time : '';
     const metaStyle = 'color:#999;font-size:12px;';
 
-    // 시스템 알림: 가운데 정렬된 조용한 회색 한 줄
+    // 시스템 알림: 가운데 정렬 회색 한 줄
     if (isSystem) {
       const bits = [timeLabel, (entry.channel && entry.channelType === 'system') ? entry.channel : ''].filter(Boolean).join(' · ');
       const prefix = bits ? escapeHtml(bits) + '  ' : '';
-      return '<p style="text-align:center;color:#999;font-size:12px;margin:4px 0;' + COPY_FONT + '">' + prefix + messageHtml + '</p>';
+      return copyCenterRow(prefix + messageHtml, 'color:#999;font-size:12px;');
     }
 
-    // 감정표현: 가운데 정렬 이탤릭 한 줄 (본문에 행위자 이름이 들어있어 이름 칩 생략)
+    // 감정표현: 가운데 정렬 이탤릭 (본문에 행위자 이름이 들어있어 이름 생략)
     if (isEmote) {
       const av = copyAvatarInline(char);
       const t = timeLabel ? ' <span style="' + metaStyle + 'font-style:normal;">' + escapeHtml(timeLabel) + '</span>' : '';
       const emoteHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
-      return '<p style="text-align:center;font-style:italic;font-size:14px;color:#333;margin:6px 0;' + COPY_FONT + '">' + av + emoteHtml + t + '</p>';
+      return copyCenterRow(av + emoteHtml + t, 'font-style:italic;font-size:14px;color:#333;');
     }
 
-    // 귓속말: 이름 칩 + "→ 상대 · 귓속말", 메시지는 이탤릭
+    // 귓속말: 왼쪽 색 줄 + 이름(굵게) + "→ 상대 · 귓속말", 메시지는 이탤릭
     if (isWhisper) {
       const isOut = entry.channelType === 'whisper-out';
       const wChar = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
-      const bg = wChar ? wChar.bg : '#888888';
-      const color = wChar ? wChar.color : '#ffffff';
+      const bar = wChar ? wChar.bg : '#cccccc';
       const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
       const meta = ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), '귓속말', timeLabel].filter(Boolean).join(' · ');
       const av = copyAvatarInline(wChar);
-      return '<div style="margin:0 0 9px 0;' + COPY_FONT + '">' +
-        '<div>' + av + copyNameChip(name, bg, color) + ' <span style="' + metaStyle + '">' + escapeHtml(meta) + '</span></div>' +
-        copyMessageBlock(messageHtml, true) +
-        '</div>';
+      const header = av + '<b style="font-size:14px;">' + escapeHtml(name) + '</b> <span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>';
+      return copyBarRow(bar, header, messageHtml, true);
     }
 
-    // 일반 대화
-    const bg = char ? char.bg : '#888888';
-    const color = char ? char.color : '#ffffff';
+    // 일반 대화: 왼쪽 색 줄 + 이름(굵게)
+    const bar = char ? char.bg : '#cccccc';
     const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
     const metaBits = [(entry.channel && shouldShowChannel()) ? '[' + entry.channel + ']' : '', timeLabel].filter(Boolean).join(' ');
     const av = copyAvatarInline(char);
-    return '<div style="margin:0 0 9px 0;' + COPY_FONT + '">' +
-      '<div>' + av + copyNameChip(name, bg, color) + (metaBits ? ' <span style="' + metaStyle + '">' + escapeHtml(metaBits) + '</span>' : '') + '</div>' +
-      copyMessageBlock(messageHtml, false) +
-      '</div>';
+    const header = av + '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' +
+      (metaBits ? ' <span style="' + metaStyle + '">' + escapeHtml(metaBits) + '</span>' : '');
+    return copyBarRow(bar, header, messageHtml, false);
   }
 
   /* ---------- HTML 코드 복사용 (티스토리 등 HTML 편집 모드) ----------
@@ -1069,7 +1075,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return;
     }
 
-    const htmlContent = '<div style="font-family:\'Malgun Gothic\',sans-serif;">' + filtered.map(buildLineHtml).join('') + '</div>';
+    // 메시지 행들을 표 하나로 감싸요 (메시지마다 표를 따로 만들면 에디터가 사이에 빈 줄을 넣어요).
+    const htmlContent = '<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:none;' + COPY_FONT + '"><tbody>' +
+      filtered.map(buildLineHtml).join('') + '</tbody></table>';
     const plainText = filtered.map(buildPlainText).join('\n');
 
     // 1차: 최신 Clipboard API (서식 있는 HTML 복사)
