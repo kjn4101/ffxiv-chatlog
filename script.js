@@ -61,6 +61,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       c.avatarValue = '';
       migrated = true;
     }
+    // 이모지 텍스트를 이미지와 별도로 기억해요. 그래야 사진이 있어도 이모지가 안 날아가요.
+    if (c.emojiText === undefined) {
+      c.emojiText = (c.avatarType === 'emoji') ? (c.avatarValue || '') : '';
+      migrated = true;
+    }
   });
   if (migrated) saveCharacters();
 
@@ -342,7 +347,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       bg: '#26303f',
       color: '#e9e4d6',
       avatarType: 'emoji',
-      avatarValue: ''
+      avatarValue: '',
+      emojiText: ''
     };
     characters.push(c);
     pinnedIds.add(c.id); // 새로 추가한 캐릭터는 narrowing 중에도 사라지지 않게 고정
@@ -387,16 +393,32 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       }
       avatarWrap.appendChild(avatarPreview);
 
+      // 아바타 미리보기를 현재 상태(이미지 우선 → 이모지 → 색상만)에 맞춰 다시 그려요.
+      function refreshAvatarPreview() {
+        if (c.avatarType === 'image' && c.avatarValue) {
+          avatarPreview.innerHTML = '<img src="' + c.avatarValue + '" alt="">';
+        } else {
+          avatarPreview.innerHTML = '';
+          avatarPreview.textContent = c.emojiText || '';
+        }
+      }
+
       const emojiInput = document.createElement('input');
       emojiInput.type = 'text';
       emojiInput.className = 'avatar-emoji-input';
       emojiInput.maxLength = 4;
       emojiInput.placeholder = '이모지';
-      emojiInput.value = c.avatarType === 'emoji' ? (c.avatarValue || '') : '';
+      emojiInput.value = c.emojiText || '';
       emojiInput.addEventListener('input', () => {
-        updateCharacter(c.id, { avatarType: 'emoji', avatarValue: emojiInput.value });
-        avatarPreview.innerHTML = '';
-        avatarPreview.textContent = emojiInput.value || '';
+        const val = emojiInput.value;
+        // 이모지는 항상 기억해두되, 사진이 올려져 있으면 사진을 우선해서 아바타는 안 바뀌어요.
+        const patch = { emojiText: val };
+        if (c.avatarType !== 'image') {
+          patch.avatarType = 'emoji';
+          patch.avatarValue = val;
+        }
+        updateCharacter(c.id, patch);
+        refreshAvatarPreview();
         renderPreview();
       });
       avatarWrap.appendChild(emojiInput);
@@ -416,7 +438,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
           fileInput.value = ''; // 같은 파일 다시 올릴 수 있게 초기화
           if (!result) return;  // 취소
           updateCharacter(c.id, { avatarType: 'image', avatarValue: result.full, avatarThumb: result.thumb });
-          avatarPreview.innerHTML = '<img src="' + result.full + '" alt="">';
+          refreshAvatarPreview();
           renderPreview();
         } catch (e) {
           alert('이미지를 처리하는 중 문제가 발생했습니다. 다른 이미지로 다시 시도해주세요.');
@@ -424,6 +446,21 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       });
       uploadLabel.appendChild(fileInput);
       avatarWrap.appendChild(uploadLabel);
+
+      // 사진 비우기 — 사진을 지우고, 이모지란에 적어둔 게 있으면 그걸로 아바타가 돌아가요.
+      const clearPhotoBtn = document.createElement('button');
+      clearPhotoBtn.type = 'button';
+      clearPhotoBtn.className = 'clear-photo-btn';
+      clearPhotoBtn.textContent = '사진 비우기';
+      clearPhotoBtn.addEventListener('click', () => {
+        // 사진이 없으면 지울 것도 없어요.
+        if (c.avatarType !== 'image' || !c.avatarValue) return;
+        if (!confirm('이 캐릭터의 프로필 사진을 지울까요?')) return;
+        updateCharacter(c.id, { avatarType: 'emoji', avatarValue: c.emojiText || '', avatarThumb: '' });
+        refreshAvatarPreview();
+        renderPreview();
+      });
+      avatarWrap.appendChild(clearPhotoBtn);
 
       row.appendChild(avatarWrap);
 
