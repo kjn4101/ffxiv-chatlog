@@ -541,6 +541,13 @@
     color: var(--text-secondary);
   }
 
+  /* 라벨 글자 폭을 고정해 두 줄의 색 칸·코드칸이 세로로 정렬되게 */
+  .color-label-text {
+    display: inline-block;
+    width: 78px;
+    flex-shrink: 0;
+  }
+
   .bg-color-row label {
     display: flex;
     align-items: center;
