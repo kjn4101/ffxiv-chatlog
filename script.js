@@ -89,8 +89,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return stripServerSuffix((name || '').split('@')[0].trim());
   }
 
-  // 이미 정사각형으로 저장된 아바타(dataURL)를 더 작은 썸네일로 축소해요.
-  // 서식 복사 시 일부 에디터가 img 크기 지정을 무시하고 원본 크기로 붙여 서식이 깨지는 걸 막아요.
+  // 저장된 아바타(dataURL)를 작은 '원형' 썸네일(PNG)로 만들어요. 서식 복사 시 에디터가 둥근 모서리를
+  // 못 살려도 이미 원형으로 그려져 있어 동그랗게 보이고, 크기 지정을 무시해도 이 크기로 또렷해요.
   function downscaleDataUrl(dataUrl, size) {
     return new Promise((resolve) => {
       const img = new Image();
@@ -99,18 +99,47 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         canvas.width = size;
         canvas.height = size;
         const ctx = canvas.getContext('2d');
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
         ctx.drawImage(img, 0, 0, size, size);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        ctx.restore();
+        resolve(canvas.toDataURL('image/png'));
       };
       img.onerror = () => resolve(dataUrl); // 실패하면 원본을 그대로
       img.src = dataUrl;
     });
   }
 
+  // 색·이모지 아바타를 '원형 이미지'로 그려요(빈 동그라미도 이미지라 에디터에서 안 사라져요).
+  function copyCircleDataUrl(bg, color, text, size) {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.fillStyle = bg || '#3a4252';
+    ctx.fill();
+    if (text) {
+      ctx.clip(); // 글자가 원 밖으로 안 나가게
+      ctx.fillStyle = color || '#ffffff';
+      const fontPx = Math.round(size * (text.length <= 1 ? 0.52 : text.length === 2 ? 0.38 : 0.28));
+      ctx.font = '700 ' + fontPx + "px 'Malgun Gothic','Noto Sans KR',sans-serif";
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, size / 2, size / 2 + Math.round(size * 0.04));
+    }
+    return canvas.toDataURL('image/png');
+  }
+
   // 서식 복사용 아바타 크기(px). 별도 사진 칸에 들어가므로 줄을 망가뜨리지 않고, 에디터가 width
   // 지정을 무시해도 이 원본 크기로 또렷하게 보여요.
   const AVATAR_THUMB_SIZE = 36;
-  const AVATAR_THUMB_VERSION = 3; // 썸네일 규격이 바뀌면 숫자를 올려 기존 썸네일을 다시 만들게 해요.
+  const AVATAR_THUMB_VERSION = 4; // 썸네일 규격이 바뀌면 숫자를 올려 기존 썸네일을 다시 만들게 해요.
 
   // 썸네일이 없거나 규격이 옛날이면 다시 만들어 둬요 (다음 서식 복사부터 작게 나옴).
   function ensureAvatarThumbs() {
@@ -1038,18 +1067,21 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
      강조하고, 메시지는 그 아래 일반 텍스트로. 어떤 에디터에 붙여도 깔끔하게 읽혀요. */
   const COPY_FONT = "font-family:'Malgun Gothic','Noto Sans KR',sans-serif;";
 
-  // 사진 칸 아바타 = 미리보기와 같은 '색 동그라미'(에디터에선 둥근모서리가 빠져 색 사각형으로 보일 수 있음).
-  // 이미지면 사진, 이모지/글씨가 있으면 그 위에, 둘 다 없으면 캐릭터 배경색만. 등록 안 된 사람만 첫 글자.
+  // 사진 칸 아바타 = 항상 '원형 이미지'로. 사진은 원형 썸네일, 그 외엔 색 동그라미(+이모지/글씨)를
+  // 즉석에서 이미지로 그려 넣어요. 이미지라서 빈 동그라미도 에디터에서 안 사라지고 둥글게 보여요.
   function copyAvatarCellHtml(char, fallbackText) {
+    let url;
     if (char && char.avatarType === 'image' && char.avatarThumb) {
-      return '<img src="' + char.avatarThumb + '" width="36" height="36" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;">';
+      url = char.avatarThumb;
+    } else {
+      const bg = char ? char.bg : '#3a4252';
+      const color = char ? char.color : '#cfd6e4';
+      const text = (char && char.avatarType !== 'image' && char.avatarValue)
+        ? char.avatarValue
+        : (char ? '' : (fallbackText || '?'));
+      url = copyCircleDataUrl(bg, color, text, AVATAR_THUMB_SIZE);
     }
-    const bg = char ? char.bg : '#3a4252';
-    const color = char ? char.color : '#cfd6e4';
-    const inner = (char && char.avatarType !== 'image' && char.avatarValue)
-      ? escapeHtml(char.avatarValue)
-      : (char ? '' : escapeHtml(fallbackText || '?'));
-    return '<span style="display:inline-block;width:36px;height:36px;line-height:36px;border-radius:50%;background:' + bg + ';color:' + color + ';text-align:center;font-size:17px;font-weight:700;vertical-align:middle;overflow:hidden;">' + inner + '</span>';
+    return '<img src="' + url + '" width="36" height="36" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;">';
   }
 
   // [아바타][이름·메시지] 2칸 행. 색 동그라미 아바타가 캐릭터 색을 나타내요(왼쪽 색 줄은 안 씀).
