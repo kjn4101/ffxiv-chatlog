@@ -9,10 +9,18 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
   }
 
+  let storageWarned = false;
   function saveCharacters() {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(characters));
-    } catch (e) { /* localStorage 사용 불가 시 무시 */ }
+      storageWarned = false;
+    } catch (e) {
+      // 저장 공간 초과 등으로 실패하면 한 번만 알려줘요.
+      if (!storageWarned) {
+        storageWarned = true;
+        alert('저장 공간이 부족해 캐릭터 설정을 저장하지 못했습니다.\n이미지 아바타 수를 줄이거나 일부 캐릭터를 삭제해주세요.');
+      }
+    }
   }
 
   let characters = loadCharacters();
@@ -76,32 +84,161 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return stripServerSuffix((name || '').split('@')[0].trim());
   }
 
-  function resizeImageToSquare(file, size) {
-    // 업로드한 이미지를 가운데 기준 정사각형으로 잘라서 작은 크기로 미리 변환해둬요.
-    // 이렇게 미리 압축해두면, 나중에 복-붙(클립보드 복사)했을 때 원본 사진이 그대로
-    // 튀어나오는 게 아니라 항상 이 작고 동그랗게 잘릴 수 있는 정사각형 이미지가 붙어요.
-    return new Promise((resolve, reject) => {
+  // 이미 정사각형으로 저장된 아바타(dataURL)를 더 작은 썸네일로 축소해요.
+  // 서식 복사 시 일부 에디터가 img 크기 지정을 무시하고 원본 크기로 붙여 서식이 깨지는 걸 막아요.
+  function downscaleDataUrl(dataUrl, size) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.onerror = () => resolve(dataUrl); // 실패하면 원본을 그대로
+      img.src = dataUrl;
+    });
+  }
+
+  const AVATAR_THUMB_SIZE = 40;
+
+  // 예전에 등록한 이미지 아바타에 썸네일이 없으면 만들어 둬요 (다음 서식 복사부터 작게 나옴).
+  function ensureAvatarThumbs() {
+    const need = characters.filter(c => c.avatarType === 'image' && c.avatarValue && !c.avatarThumb);
+    if (need.length === 0) return;
+    Promise.all(need.map(c => downscaleDataUrl(c.avatarValue, AVATAR_THUMB_SIZE).then(t => { c.avatarThumb = t; })))
+      .then(() => saveCharacters());
+  }
+
+  /* ---------- 사진 크롭 편집기 (드래그 + 확대) ----------
+     업로드한 사진을 원형 틀 안에서 끌어 위치를 맞추고 확대/축소한 뒤 잘라요.
+     원본은 편집 중에만 메모리에 두고, 잘라낸 200px 결과만 저장하므로 저장 용량 부담은 그대로예요. */
+  function openCropEditor(file) {
+    return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => {
         const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = size;
-          canvas.height = size;
-          const ctx = canvas.getContext('2d');
-
-          const srcSize = Math.min(img.naturalWidth, img.naturalHeight);
-          const srcX = (img.naturalWidth - srcSize) / 2;
-          const srcY = (img.naturalHeight - srcSize) / 2;
-          ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, size, size);
-
-          resolve(canvas.toDataURL('image/jpeg', 0.85));
-        };
-        img.onerror = () => reject(new Error('이미지를 불러오지 못했어요.'));
+        img.onload = () => showCropUI(img, resolve);
+        img.onerror = () => { alert('이미지를 불러오지 못했습니다. 다른 이미지로 시도해주세요.'); resolve(null); };
         img.src = reader.result;
       };
-      reader.onerror = () => reject(new Error('파일을 읽지 못했어요.'));
+      reader.onerror = () => { alert('파일을 읽지 못했습니다.'); resolve(null); };
       reader.readAsDataURL(file);
+    });
+  }
+
+  function showCropUI(img, resolve) {
+    const VP = 260;                 // 원형 미리보기 틀 한 변(px)
+    const OUT = 200;                // 저장될 정사각형 크기(px)
+    const natW = img.naturalWidth, natH = img.naturalHeight;
+    const coverScale = VP / Math.min(natW, natH); // 줌 1일 때 틀을 꽉 채우는 배율
+    let zoom = 1, tx = 0, ty = 0;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'crop-overlay';
+    const box = document.createElement('div');
+    box.className = 'crop-box';
+
+    const title = document.createElement('div');
+    title.className = 'crop-title';
+    title.textContent = '사진 위치 조정';
+    box.appendChild(title);
+
+    const viewport = document.createElement('div');
+    viewport.className = 'crop-viewport';
+    viewport.style.width = VP + 'px';
+    viewport.style.height = VP + 'px';
+    const imgEl = document.createElement('img');
+    imgEl.className = 'crop-img';
+    imgEl.src = img.src;
+    imgEl.draggable = false;
+    viewport.appendChild(imgEl);
+    box.appendChild(viewport);
+
+    const zoomRow = document.createElement('div');
+    zoomRow.className = 'crop-zoom';
+    const minLabel = document.createElement('span'); minLabel.textContent = '축소';
+    const slider = document.createElement('input');
+    slider.type = 'range'; slider.min = '1'; slider.max = '3'; slider.step = '0.01'; slider.value = '1';
+    const maxLabel = document.createElement('span'); maxLabel.textContent = '확대';
+    zoomRow.appendChild(minLabel); zoomRow.appendChild(slider); zoomRow.appendChild(maxLabel);
+    box.appendChild(zoomRow);
+
+    const hint = document.createElement('p');
+    hint.className = 'crop-hint';
+    hint.textContent = '사진을 끌어 위치를 맞추고, 슬라이더로 확대/축소하세요.';
+    box.appendChild(hint);
+
+    const btns = document.createElement('div');
+    btns.className = 'crop-btns';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button'; cancelBtn.className = 'btn btn-outline'; cancelBtn.textContent = '취소';
+    const applyBtn = document.createElement('button');
+    applyBtn.type = 'button'; applyBtn.className = 'btn btn-primary'; applyBtn.textContent = '적용';
+    btns.appendChild(cancelBtn); btns.appendChild(applyBtn);
+    box.appendChild(btns);
+
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+
+    const eff = () => coverScale * zoom;
+    function clampAndRender() {
+      const w = natW * eff(), h = natH * eff();
+      const minTx = VP - w, minTy = VP - h;
+      tx = Math.min(0, Math.max(minTx, tx));
+      ty = Math.min(0, Math.max(minTy, ty));
+      imgEl.style.width = w + 'px';
+      imgEl.style.height = h + 'px';
+      imgEl.style.transform = 'translate(' + tx + 'px,' + ty + 'px)';
+    }
+    clampAndRender();
+
+    let dragging = false, startX = 0, startY = 0, baseTx = 0, baseTy = 0;
+    function pointerStart(x, y) { dragging = true; startX = x; startY = y; baseTx = tx; baseTy = ty; }
+    function pointerMove(x, y) { if (!dragging) return; tx = baseTx + (x - startX); ty = baseTy + (y - startY); clampAndRender(); }
+    function pointerEnd() { dragging = false; }
+
+    const onMouseDown = e => { pointerStart(e.clientX, e.clientY); e.preventDefault(); };
+    const onMouseMove = e => pointerMove(e.clientX, e.clientY);
+    const onMouseUp = () => pointerEnd();
+    viewport.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    viewport.addEventListener('touchstart', e => { if (e.touches[0]) pointerStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+    viewport.addEventListener('touchmove', e => { if (e.touches[0]) { pointerMove(e.touches[0].clientX, e.touches[0].clientY); e.preventDefault(); } }, { passive: false });
+    viewport.addEventListener('touchend', pointerEnd);
+
+    slider.addEventListener('input', () => {
+      // 틀 중심을 기준으로 확대/축소해 보던 부분이 유지되게
+      const c = VP / 2;
+      const oldEff = eff();
+      zoom = parseFloat(slider.value);
+      const newEff = eff();
+      tx = c - (c - tx) * (newEff / oldEff);
+      ty = c - (c - ty) * (newEff / oldEff);
+      clampAndRender();
+    });
+
+    function cleanup() {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      overlay.remove();
+    }
+    function close(result) { cleanup(); resolve(result); }
+
+    cancelBtn.addEventListener('click', () => close(null));
+    overlay.addEventListener('click', e => { if (e.target === overlay) close(null); });
+    applyBtn.addEventListener('click', () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = OUT; canvas.height = OUT;
+      const ctx = canvas.getContext('2d');
+      const e2 = eff();
+      const sSize = VP / e2;
+      ctx.drawImage(img, -tx / e2, -ty / e2, sSize, sSize, 0, 0, OUT, OUT);
+      const full = canvas.toDataURL('image/jpeg', 0.85);
+      downscaleDataUrl(full, AVATAR_THUMB_SIZE).then(thumb => close({ full, thumb }));
     });
   }
 
@@ -275,9 +412,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         const file = fileInput.files[0];
         if (!file) return;
         try {
-          const resized = await resizeImageToSquare(file, 200);
-          updateCharacter(c.id, { avatarType: 'image', avatarValue: resized });
-          avatarPreview.innerHTML = '<img src="' + resized + '" alt="">';
+          const result = await openCropEditor(file);
+          fileInput.value = ''; // 같은 파일 다시 올릴 수 있게 초기화
+          if (!result) return;  // 취소
+          updateCharacter(c.id, { avatarType: 'image', avatarValue: result.full, avatarThumb: result.thumb });
+          avatarPreview.innerHTML = '<img src="' + result.full + '" alt="">';
           renderPreview();
         } catch (e) {
           alert('이미지를 처리하는 중 문제가 발생했습니다. 다른 이미지로 다시 시도해주세요.');
@@ -633,20 +772,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       inner.style.color = char.color;
     }
 
-    // 이미지나 이모지가 있을 때만 아바타를 붙이고, 비어있으면 아예 생략해 알약을 깔끔하게 둬요.
-    const hasImage = char && char.avatarType === 'image' && char.avatarValue;
-    const hasEmoji = char && char.avatarType !== 'image' && char.avatarValue;
-    if (hasImage || hasEmoji) {
-      const avatar = document.createElement('span');
-      avatar.className = 'log-emote-avatar';
-      if (hasImage) {
-        avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
-      } else {
-        avatar.textContent = char.avatarValue;
-      }
-      inner.appendChild(avatar);
-    }
-
+    // 감정표현은 나래이션이라 아바타(프로필 사진)를 붙이지 않아요.
     const msg = document.createElement('span');
     msg.className = 'log-emote-msg';
     msg.innerHTML = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
@@ -871,8 +997,13 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   function copyAvatarInline(char) {
     // 이름 앞에 붙는 작은 아바타. 비어있으면 생략해 깔끔하게.
-    if (char && char.avatarType === 'image' && char.avatarValue) {
-      return '<img src="' + char.avatarValue + '" width="18" height="18" style="width:18px;height:18px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:5px;">';
+    // 이미지는 작은 썸네일을 써요(에디터가 크기 지정을 무시해도 작게 나오도록). 썸네일이 아직
+    // 없으면(예전 데이터) 이미지를 생략해 서식이 깨지지 않게 합니다.
+    if (char && char.avatarType === 'image') {
+      if (char.avatarThumb) {
+        return '<img src="' + char.avatarThumb + '" width="18" height="18" style="width:18px;height:18px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:5px;">';
+      }
+      return '';
     }
     if (char && char.avatarValue) {
       return '<span style="vertical-align:middle;margin-right:4px;">' + escapeHtml(char.avatarValue) + '</span>';
@@ -915,12 +1046,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return copyCenterRow(prefix + messageHtml, 'color:#999;font-size:12px;');
     }
 
-    // 감정표현: 가운데 정렬 이탤릭 (본문에 행위자 이름이 들어있어 이름 생략)
+    // 감정표현: 가운데 정렬 이탤릭 (나래이션이라 아바타·이름 없이 본문만)
     if (isEmote) {
-      const av = copyAvatarInline(char);
       const t = timeLabel ? ' <span style="' + metaStyle + 'font-style:normal;">' + escapeHtml(timeLabel) + '</span>' : '';
       const emoteHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
-      return copyCenterRow(av + emoteHtml + t, 'font-style:italic;font-size:14px;color:#333;');
+      return copyCenterRow(emoteHtml + t, 'font-style:italic;font-size:14px;color:#333;');
     }
 
     // 귓속말: 왼쪽 색 줄 + 이름(굵게) + "→ 상대 · 귓속말", 메시지는 이탤릭
@@ -987,21 +1117,15 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return '<div style="text-align:center;color:#8a93a6;font-size:12px;margin-bottom:10px;">' + t + tag + msgHtml + '</div>';
     }
 
-    // 감정표현
+    // 감정표현 (나래이션이라 아바타 없이 본문만)
     if (isEmote) {
       const bg = char ? char.bg : '#242c39';
       const color = char ? char.color : '#e9e4d6';
-      let av = '';
-      if (char && char.avatarType === 'image' && char.avatarValue) {
-        av = '<span style="display:inline-block;width:22px;height:22px;border-radius:50%;overflow:hidden;vertical-align:middle;margin-right:8px;"><img src="' + char.avatarValue + '" style="width:100%;height:100%;object-fit:cover;"></span>';
-      } else if (char && char.avatarValue) {
-        av = '<span style="margin-right:6px;">' + escapeHtml(char.avatarValue) + '</span>';
-      }
       const t = time ? '<span style="font-style:normal;font-size:11px;opacity:0.65;margin-left:8px;">' + escapeHtml(time) + '</span>' : '';
       const emoteHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
       return '<div style="text-align:center;margin-bottom:12px;">' +
         '<span style="display:inline-block;background:' + bg + ';color:' + color + ';border-radius:999px;padding:9px 16px;font-style:italic;font-size:14px;">' +
-          av + emoteHtml + t +
+          emoteHtml + t +
         '</span></div>';
     }
 
@@ -1293,3 +1417,4 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   renderCharList();
   applyLogBackground();
+  ensureAvatarThumbs();
