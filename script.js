@@ -783,6 +783,14 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       if (!(key in channelFilterState)) channelFilterState[key] = false;
     });
 
+    // 가나다순 정렬. 단 '시스템/기타'는 맨 아래로.
+    const SYS = '시스템/기타';
+    seen.sort((a, b) => a.localeCompare(b, 'ko'));
+    if (seen.includes(SYS)) {
+      seen.splice(seen.indexOf(SYS), 1);
+      seen.push(SYS);
+    }
+
     container.innerHTML = '';
     if (seen.length === 0) {
       const hint = document.createElement('p');
@@ -791,6 +799,26 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       container.appendChild(hint);
       return;
     }
+
+    // 전체 선택 (모두 체크면 켜짐, 일부만 체크면 중간 상태)
+    const allLabel = document.createElement('label');
+    allLabel.className = 'channel-check channel-check-all';
+    const allCb = document.createElement('input');
+    allCb.type = 'checkbox';
+    const allChecked = seen.every(k => channelFilterState[k] !== false);
+    const someChecked = seen.some(k => channelFilterState[k] !== false);
+    allCb.checked = allChecked;
+    allCb.addEventListener('change', () => {
+      const v = allCb.checked;
+      seen.forEach(k => { channelFilterState[k] = v; });
+      renderPreview();
+    });
+    allLabel.appendChild(allCb);
+    const allSpan = document.createElement('span');
+    allSpan.textContent = '전체 선택';
+    allLabel.appendChild(allSpan);
+    container.appendChild(allLabel);
+    allCb.indeterminate = someChecked && !allChecked;
 
     seen.forEach(key => {
       const label = document.createElement('label');

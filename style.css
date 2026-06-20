@@ -141,6 +141,28 @@
     letter-spacing: 0.5px;
   }
 
+  /* 제목 + 전체 초기화를 한 줄에 (초기화는 오른쪽 끝) */
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--border-soft);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+
+  .panel-head h2 {
+    border-bottom: none;
+    padding-bottom: 0;
+    margin: 0;
+  }
+
+  .panel-head .reset-link {
+    margin-top: 0;
+    flex-shrink: 0;
+  }
+
   /* 캐릭터 편집 목록 상단 컨트롤 */
   .char-controls {
     display: flex;
@@ -551,6 +573,15 @@
   }
 
   .channel-check input { width: 15px; height: 15px; cursor: pointer; accent-color: var(--gold); }
+
+  /* 전체 선택 줄 — 살짝 강조 + 아래 구분선 */
+  .channel-check-all {
+    color: var(--text-primary);
+    font-weight: 500;
+    padding-bottom: 8px;
+    margin-bottom: 4px;
+    border-bottom: 1px dashed var(--border-soft);
+  }
 
   /* ---------- 메인 패널 ---------- */
   .hint-text {
