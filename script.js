@@ -1439,7 +1439,6 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   /* ---------- 이벤트 연결 ---------- */
 
   document.getElementById('addCharBtn').addEventListener('click', addCharacter);
-  document.getElementById('renderBtn').addEventListener('click', renderPreview);
   document.getElementById('filterToggle').addEventListener('change', renderPreview);
   document.getElementById('showChannelToggle').addEventListener('change', renderPreview);
   document.getElementById('showTimeToggle').addEventListener('change', renderPreview);
@@ -1514,5 +1513,6 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   });
 
   renderCharList();
+  renderPreview();
   applyLogBackground();
   ensureAvatarThumbs();

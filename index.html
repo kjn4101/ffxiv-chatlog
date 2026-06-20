@@ -61,18 +61,15 @@
     </aside>
     <section class="panel">
       <h2>로그 입력</h2>
-      <p class="hint-text">FF14 채팅 로그를 복사하여 붙여넣으세요. 파티 번호 아이콘 등 닉네임 앞에 붙는 특수문자는 자동으로 떼어냅니다.<br>
-      현재 인식 가능한 형식: <br><code>[채널]&lt;닉네임&gt; 메시지</code> (자유부대/링크셸/서초링 등), <br><code>(닉네임) 메시지</code> (파티), <br><code>닉네임: 메시지</code> (일반 채팅), <br><code>&gt;&gt;닉네임: 메시지</code> / <code>닉네임 &gt;&gt; 메시지</code> (귓속말), <br><code>[이벤트] 메시지</code> (시스템 공지), <br><code>닉네임이/가 ~합니다</code> (감정표현, 닉네임 등록 필요). <br>인식하지 못하는 형식이 있을 시 문의 바랍니다.</p>
       <textarea id="logInput" placeholder="여기에 채팅 로그를 붙여넣으세요"></textarea>
       <div class="actions">
-        <button id="renderBtn" class="btn btn-primary" type="button">변환하기</button>
         <button id="copyBtn" class="btn btn-cyan-outline" type="button">서식 복사하기</button>
         <button id="htmlCopyBtn" class="btn btn-cyan-outline" type="button">HTML 코드 복사</button>
         <button id="textCopyBtn" class="btn btn-outline" type="button">텍스트만 복사</button>
         <button id="exportBtn" class="btn btn-gold" type="button">이미지로 저장</button>
         <button id="clearBtn" class="btn btn-outline" type="button">지우기</button>
       </div>
-      <p class="export-note">* 서식 복사하기는 색상과 아바타가 유지된 채로 복사되어, 카페 글쓰기 창이나 워드, 메일처럼 서식을 지원하는 곳에 적합합니다. HTML 코드 복사는 코드 자체를 복사하므로, 티스토리·블로그의 'HTML 편집' 모드에 붙여넣으면 미리보기 모습(둥근 말풍선 등)이 그대로 살아납니다. 텍스트만 복사는 디스코드나 메모장처럼 서식이 필요 없는 곳에 적합합니다. 모든 복사 기능은 인터넷 연결 없이 동작합니다. 이미지로 저장 기능만 처음 사용 시 인터넷 연결이 필요합니다.</p>
+      <p class="export-note">* 서식 복사하기는 색상과 아바타가 유지된 채로 복사되어, 카페 글쓰기 창이나 워드, 메일처럼 서식을 지원하는 곳에 적합합니다. HTML 코드 복사는 코드 자체를 복사하므로, 티스토리·블로그의 'HTML 편집' 모드에 붙여넣으면 미리보기 모습(둥근 말풍선 등)이 그대로 살아납니다. 텍스트만 복사는 디스코드나 메모장처럼 서식이 필요 없는 곳에 적합합니다.</p>
       <div class="preview-frame">
         <div class="preview-frame-corner tl"></div>
         <div class="preview-frame-corner tr"></div>
