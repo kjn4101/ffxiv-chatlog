@@ -1084,20 +1084,21 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return '<img src="' + url + '" width="36" height="36" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;">';
   }
 
-  // [아바타][이름·메시지] 2칸 행. 색 동그라미 아바타가 캐릭터 색을 나타내요(왼쪽 색 줄은 안 씀).
-  function copyMsgRow(avatarHtml, headerHtml, bodyHtml, italic) {
+  // [색 줄][아바타][이름·메시지] 3칸 행. 색 줄은 캐릭터 배경색이라, 사진을 넣어도 캐릭터 색이 남아요.
+  function copyMsgRow(barColor, avatarHtml, headerHtml, bodyHtml, italic) {
     return '<tr>' +
-      '<td width="44" valign="top" style="width:44px;border:none;padding:3px 0 0 0;text-align:center;">' + avatarHtml + '</td>' +
+      '<td width="4" style="width:4px;background:' + barColor + ';border:none;padding:0;font-size:1px;line-height:1px;">&nbsp;</td>' +
+      '<td width="44" valign="top" style="width:44px;border:none;padding:3px 0 0 7px;text-align:center;">' + avatarHtml + '</td>' +
       '<td valign="top" style="border:none;padding:2px 0 12px 10px;' + COPY_FONT + '">' +
         '<div style="font-size:14px;line-height:1.5;">' + headerHtml + '</div>' +
         '<div style="font-size:14px;line-height:1.55;color:#222;' + (italic ? 'font-style:italic;' : '') + '">' + bodyHtml + '</div>' +
       '</td></tr>';
   }
 
-  // 가운데 정렬 행 (시스템/감정표현) — 두 칸을 합쳐 가운데로
+  // 가운데 정렬 행 (시스템/감정표현) — 세 칸을 합쳐 가운데로
   function copyCenterRow(innerHtml, extraStyle) {
     return '<tr>' +
-      '<td colspan="2" style="border:none;padding:4px 0;text-align:center;' + COPY_FONT + (extraStyle || '') + '">' + innerHtml + '</td>' +
+      '<td colspan="3" style="border:none;padding:4px 0;text-align:center;' + COPY_FONT + (extraStyle || '') + '">' + innerHtml + '</td>' +
     '</tr>';
   }
 
@@ -1133,15 +1134,15 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const meta = ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), '귓속말', timeLabel].filter(Boolean).join(' · ');
       const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b> <span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>';
       const fallback = isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?');
-      return copyMsgRow(copyAvatarCellHtml(wChar, fallback), header, messageHtml, true);
+      return copyMsgRow(wChar ? wChar.bg : '#cccccc', copyAvatarCellHtml(wChar, fallback), header, messageHtml, true);
     }
 
-    // 일반 대화: 아바타 + 이름(굵게)
+    // 일반 대화: 색 줄 + 아바타 + 이름(굵게)
     const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
     const metaBits = [(entry.channel && shouldShowChannel()) ? '[' + entry.channel + ']' : '', timeLabel].filter(Boolean).join(' ');
     const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' +
       (metaBits ? ' <span style="' + metaStyle + '">' + escapeHtml(metaBits) + '</span>' : '');
-    return copyMsgRow(copyAvatarCellHtml(char, (entry.nickname || '?').charAt(0) || '?'), header, messageHtml, false);
+    return copyMsgRow(char ? char.bg : '#cccccc', copyAvatarCellHtml(char, (entry.nickname || '?').charAt(0) || '?'), header, messageHtml, false);
   }
 
   /* ---------- HTML 코드 복사용 (티스토리 등 HTML 편집 모드) ----------
@@ -1271,7 +1272,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     // 메시지 행들을 표 하나로 감싸요 (메시지마다 표를 따로 만들면 에디터가 사이에 빈 줄을 넣어요).
     // 가로 100%로 늘려 감정표현·시스템 행이 페이지 중앙에 오게 하고, colgroup으로 아바타 칸 폭을 고정해요.
     const htmlContent = '<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:none;width:100%;table-layout:fixed;' + COPY_FONT + '">' +
-      '<colgroup><col style="width:44px;"><col></colgroup><tbody>' +
+      '<colgroup><col style="width:5px;"><col style="width:44px;"><col></colgroup><tbody>' +
       filtered.map(buildLineHtml).join('') + '</tbody></table>';
     const plainText = filtered.map(buildPlainText).join('\n');
 
