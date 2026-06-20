@@ -188,8 +188,9 @@
   .out-check {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
+    gap: 5px;
+    font-size: 11px;
+    white-space: nowrap;
     color: var(--text-secondary);
     cursor: pointer;
   }
@@ -342,7 +343,7 @@
   .char-meta-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 7px 10px;
+    gap: 6px 8px;
     align-items: center;
     margin-top: 6px;
   }
@@ -350,14 +351,15 @@
   .color-label {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
+    gap: 5px;
+    font-size: 11px;
+    white-space: nowrap;
     color: var(--text-secondary);
   }
 
   .color-label input[type="color"] {
-    width: 28px;
-    height: 22px;
+    width: 26px;
+    height: 20px;
     padding: 0;
     border: 1px solid var(--border-soft);
     border-radius: 5px;
@@ -368,8 +370,9 @@
   .me-check {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 12px;
+    gap: 5px;
+    font-size: 11px;
+    white-space: nowrap;
     color: var(--text-secondary);
     cursor: pointer;
   }
@@ -382,7 +385,7 @@
     right: 6px;
     background: transparent;
     border: none;
-    color: var(--text-secondary);
+    color: var(--danger);
     width: 20px;
     height: 20px;
     border-radius: 50%;
@@ -393,7 +396,7 @@
     transition: background 0.2s var(--ease), color 0.2s var(--ease);
   }
 
-  .remove-btn:hover { background: rgba(208, 122, 122, 0.18); color: var(--danger); }
+  .remove-btn:hover { background: rgba(208, 122, 122, 0.18); }
 
   /* ---------- 공통 입력 포커스 ---------- */
   input:focus-visible,
