@@ -1076,7 +1076,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
 
     // 메시지 행들을 표 하나로 감싸요 (메시지마다 표를 따로 만들면 에디터가 사이에 빈 줄을 넣어요).
-    const htmlContent = '<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:none;' + COPY_FONT + '"><tbody>' +
+    // 가로 100%로 늘려 감정표현·시스템 행이 페이지 중앙에 오게 하고, colgroup으로 색 줄 칸은 얇게 고정해요.
+    const htmlContent = '<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:none;width:100%;table-layout:fixed;' + COPY_FONT + '">' +
+      '<colgroup><col style="width:5px;"><col></colgroup><tbody>' +
       filtered.map(buildLineHtml).join('') + '</tbody></table>';
     const plainText = filtered.map(buildPlainText).join('\n');
 
