@@ -312,10 +312,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       });
       fields.appendChild(dispInput);
 
-      const colorRow = document.createElement('div');
-      colorRow.className = 'color-row';
-
       const bgLabel = document.createElement('label');
+      bgLabel.className = 'color-label';
       bgLabel.textContent = '배경';
       const bgInput = document.createElement('input');
       bgInput.type = 'color';
@@ -326,9 +324,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         renderPreview();
       });
       bgLabel.appendChild(bgInput);
-      colorRow.appendChild(bgLabel);
 
       const colorLabel = document.createElement('label');
+      colorLabel.className = 'color-label';
       colorLabel.textContent = '글씨';
       const colorInput = document.createElement('input');
       colorInput.type = 'color';
@@ -339,9 +337,6 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         renderPreview();
       });
       colorLabel.appendChild(colorInput);
-      colorRow.appendChild(colorLabel);
-
-      fields.appendChild(colorRow);
 
       // '내 캐릭터' 지정 — 내가 보낸 귓속말을 이 캐릭터 이름으로 표시해요. 한 명만 지정돼요.
       const meLabel = document.createElement('label');
@@ -377,12 +372,14 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       outLabel.appendChild(outInput);
       outLabel.appendChild(document.createTextNode(' 출력에 표시'));
 
-      // 두 토글을 한 줄에 나란히
-      const toggleRow = document.createElement('div');
-      toggleRow.className = 'toggle-row';
-      toggleRow.appendChild(meLabel);
-      toggleRow.appendChild(outLabel);
-      fields.appendChild(toggleRow);
+      // 배경/글씨 + 내캐릭터/출력을 2열 격자로 가지런히 정렬 (배경↔내캐릭터, 글씨↔출력 정렬)
+      const metaGrid = document.createElement('div');
+      metaGrid.className = 'char-meta-grid';
+      metaGrid.appendChild(bgLabel);
+      metaGrid.appendChild(colorLabel);
+      metaGrid.appendChild(meLabel);
+      metaGrid.appendChild(outLabel);
+      fields.appendChild(metaGrid);
 
       if (hiddenOutputIds.has(c.id)) row.classList.add('char-hidden');
 
@@ -952,6 +949,95 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return cardTableHtml(bg, color, av, header, messageHtml, false);
   }
 
+  /* ---------- HTML 코드 복사용 (티스토리 등 HTML 편집 모드) ----------
+     티스토리·블로그 HTML 모드나 웹페이지는 진짜 브라우저로 렌더링하므로, 미리보기 모습
+     (둥근 말풍선·아바타 원·귓속말 반투명·감정표현 알약)을 그대로 인라인 스타일로 재현해요. */
+
+  function richAvatarHtml(char, fallback, size, opacity) {
+    const op = (opacity != null && opacity < 1) ? 'opacity:' + opacity + ';' : '';
+    const base = 'width:' + size + 'px;height:' + size + 'px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;';
+    if (!char) {
+      return '<div style="' + base + 'border:1px dashed #313b4b;color:#8b93a3;font-weight:700;font-size:14px;' + op + '">' + escapeHtml(fallback || '?') + '</div>';
+    }
+    const inner = (char.avatarType === 'image' && char.avatarValue)
+      ? '<img src="' + char.avatarValue + '" style="width:100%;height:100%;object-fit:cover;display:block;">'
+      : escapeHtml(char.avatarValue || '');
+    return '<div style="' + base + 'background:' + char.bg + ';color:' + char.color + ';font-size:16px;' + op + '">' + inner + '</div>';
+  }
+
+  function richRowHtml(av, bg, color, header, body, dashed) {
+    const border = dashed ? 'border:1px dashed rgba(255,255,255,0.2);' : '';
+    return '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">' +
+      av +
+      '<div style="flex:1;border-radius:10px;padding:9px 12px;background:' + bg + ';color:' + color + ';' + border + '">' +
+        '<div style="margin-bottom:3px;">' + header + '</div>' +
+        '<div style="font-size:14px;line-height:1.55;word-break:break-word;">' + body + '</div>' +
+      '</div></div>';
+  }
+
+  function buildRichLineHtml(entry) {
+    const char = findCharacterByNickname(entry.nickname);
+    const isEmote = entry.channelType === 'emote';
+    const isWhisper = entry.channelType === 'whisper-out' || entry.channelType === 'whisper-in';
+    const isSystem = !entry.nickname && !isWhisper;
+    const time = (entry.time && shouldShowTime()) ? entry.time : '';
+    const msgHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
+
+    // 시스템 알림
+    if (isSystem) {
+      const t = time ? '<span style="font-size:11px;opacity:0.55;margin-right:6px;">' + escapeHtml(time) + '</span>' : '';
+      const tag = (entry.channel && entry.channelType === 'system')
+        ? '<span style="font-size:10.5px;color:#a8843f;border:1px solid #2c3648;border-radius:4px;padding:0 5px;margin-right:6px;">' + escapeHtml(entry.channel) + '</span>' : '';
+      return '<div style="text-align:center;color:#8a93a6;font-size:12px;margin-bottom:10px;">' + t + tag + msgHtml + '</div>';
+    }
+
+    // 감정표현
+    if (isEmote) {
+      const bg = char ? char.bg : '#242c39';
+      const color = char ? char.color : '#e9e4d6';
+      let av = '';
+      if (char && char.avatarType === 'image' && char.avatarValue) {
+        av = '<span style="display:inline-block;width:22px;height:22px;border-radius:50%;overflow:hidden;vertical-align:middle;margin-right:8px;"><img src="' + char.avatarValue + '" style="width:100%;height:100%;object-fit:cover;"></span>';
+      } else if (char && char.avatarValue) {
+        av = '<span style="margin-right:6px;">' + escapeHtml(char.avatarValue) + '</span>';
+      }
+      const t = time ? '<span style="font-style:normal;font-size:11px;opacity:0.65;margin-left:8px;">' + escapeHtml(time) + '</span>' : '';
+      const emoteHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
+      return '<div style="text-align:center;margin-bottom:12px;">' +
+        '<span style="display:inline-block;background:' + bg + ';color:' + color + ';border-radius:999px;padding:9px 16px;font-style:italic;font-size:14px;">' +
+          av + emoteHtml + t +
+        '</span></div>';
+    }
+
+    // 귓속말
+    if (isWhisper) {
+      const isOut = entry.channelType === 'whisper-out';
+      const wChar = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
+      const bg = wChar ? hexToRgba(wChar.bg, 0.72) : 'rgba(36, 44, 57, 0.72)';
+      const color = wChar ? wChar.color : '#e9e4d6';
+      const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
+      const meta = ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), time].filter(Boolean).join(' ');
+      const av = richAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?'), 36, 0.72);
+      const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b> <span style="font-size:11px;opacity:0.7;">' + escapeHtml(meta) + '</span>';
+      return richRowHtml(av, bg, color, header, '<span style="font-style:italic;">' + msgHtml + '</span>', true);
+    }
+
+    // 일반 대화
+    const bg = char ? char.bg : '#242c39';
+    const color = char ? char.color : '#e9e4d6';
+    const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
+    const ch = (entry.channel && shouldShowChannel()) ? ' <span style="font-size:11px;opacity:0.75;">[' + escapeHtml(entry.channel) + ']</span>' : '';
+    const t = time ? ' <span style="font-size:11px;opacity:0.6;">' + escapeHtml(time) + '</span>' : '';
+    const av = richAvatarHtml(char, (entry.nickname || '?').charAt(0) || '?', 36, 1);
+    const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' + ch + t;
+    return richRowHtml(av, bg, color, header, msgHtml, false);
+  }
+
+  function buildRichHtmlDocument(filtered) {
+    const inner = filtered.map(buildRichLineHtml).join('');
+    return '<div style="background:' + settings.bgColor + ';padding:18px 20px;border-radius:10px;max-width:680px;' + COPY_FONT + '">' + inner + '</div>';
+  }
+
   function buildPlainText(entry) {
     const char = findCharacterByNickname(entry.nickname);
     const isEmote = entry.channelType === 'emote';
@@ -1084,6 +1170,50 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
   }
 
+  // HTML '코드 자체'를 텍스트로 복사 — 티스토리/블로그 HTML 편집 모드에 붙여넣으면 모습 그대로 살아나요.
+  async function copyHtmlCode() {
+    const text = document.getElementById('logInput').value;
+    const filtered = getFilteredEntries(text);
+    if (filtered.length === 0) {
+      alert('복사할 로그가 없습니다. 먼저 변환하기를 눌러주세요.');
+      return;
+    }
+
+    const code = buildRichHtmlDocument(filtered);
+
+    // 1차: 최신 Clipboard API (코드를 '일반 텍스트'로 복사)
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(code);
+        flashCopyButton('htmlCopyBtn', true);
+        return;
+      }
+    } catch (e) {
+      // 실패하면 아래 구형 방식으로 시도
+    }
+
+    // 2차 fallback: 임시 textarea로 선택 후 execCommand 복사
+    const temp = document.createElement('textarea');
+    temp.value = code;
+    temp.style.position = 'fixed';
+    temp.style.left = '-9999px';
+    document.body.appendChild(temp);
+    temp.select();
+
+    let success = false;
+    try {
+      success = document.execCommand('copy');
+    } catch (e) {
+      success = false;
+    }
+
+    document.body.removeChild(temp);
+    flashCopyButton('htmlCopyBtn', success);
+    if (!success) {
+      alert('클립보드 복사에 실패했습니다. 사용 중인 브라우저에서 지원하지 않을 수 있습니다.');
+    }
+  }
+
   /* ---------- 이벤트 연결 ---------- */
 
   document.getElementById('addCharBtn').addEventListener('click', addCharacter);
@@ -1092,6 +1222,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   document.getElementById('showChannelToggle').addEventListener('change', renderPreview);
   document.getElementById('showTimeToggle').addEventListener('change', renderPreview);
   document.getElementById('copyBtn').addEventListener('click', copyFormatted);
+  document.getElementById('htmlCopyBtn').addEventListener('click', copyHtmlCode);
   document.getElementById('textCopyBtn').addEventListener('click', copyPlainText);
   document.getElementById('exportBtn').addEventListener('click', exportImage);
 

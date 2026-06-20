@@ -184,14 +184,6 @@
 
   .char-bulk button:hover { border-color: var(--cyan); color: var(--cyan); }
 
-  /* '내 캐릭터' / '출력에 표시' 토글을 한 줄에 나란히 */
-  .toggle-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 14px;
-    margin-top: 3px;
-  }
-
   /* 출력 포함 토글 */
   .out-check {
     display: flex;
@@ -275,20 +267,20 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    width: 46px;
+    gap: 5px;
+    width: 56px;
   }
 
   .avatar-preview {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     background: var(--panel);
     border: 1px solid var(--border-soft);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px;
+    font-size: 17px;
     overflow: hidden;
     box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.2);
   }
@@ -300,10 +292,10 @@
   }
 
   .avatar-emoji-input {
-    width: 44px;
+    width: 48px;
     text-align: center;
-    font-size: 11px;
-    padding: 3px 2px;
+    font-size: 12px;
+    padding: 4px 2px;
     background: var(--panel);
     border: 1px solid var(--border-soft);
     border-radius: 5px;
@@ -315,6 +307,7 @@
     color: var(--cyan);
     cursor: pointer;
     text-decoration: none;
+    white-space: nowrap;
     border-bottom: 1px dotted currentColor;
     transition: color 0.2s var(--ease);
   }
@@ -345,14 +338,16 @@
     color: var(--text-secondary);
   }
 
-  .color-row {
-    display: flex;
-    gap: 12px;
+  /* 배경/글씨 + 내캐릭터/출력을 2열 격자로 정렬 (배경↔내캐릭터, 글씨↔출력) */
+  .char-meta-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px 10px;
     align-items: center;
-    margin-top: 1px;
+    margin-top: 6px;
   }
 
-  .color-row label {
+  .color-label {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -360,9 +355,9 @@
     color: var(--text-secondary);
   }
 
-  .color-row input[type="color"] {
-    width: 30px;
-    height: 24px;
+  .color-label input[type="color"] {
+    width: 28px;
+    height: 22px;
     padding: 0;
     border: 1px solid var(--border-soft);
     border-radius: 5px;
