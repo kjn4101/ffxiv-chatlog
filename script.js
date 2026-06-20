@@ -139,7 +139,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   // 서식 복사용 아바타 크기(px). 별도 사진 칸에 들어가므로 줄을 망가뜨리지 않고, 에디터가 width
   // 지정을 무시해도 이 원본 크기로 또렷하게 보여요.
   const AVATAR_THUMB_SIZE = 36;
-  const AVATAR_THUMB_VERSION = 4; // 썸네일 규격이 바뀌면 숫자를 올려 기존 썸네일을 다시 만들게 해요.
+  const AVATAR_THUMB_VERSION = 6; // 썸네일 규격이 바뀌면 숫자를 올려 기존 썸네일을 다시 만들게 해요.
 
   // 썸네일이 없거나 규격이 옛날이면 다시 만들어 둬요 (다음 서식 복사부터 작게 나옴).
   function ensureAvatarThumbs() {
@@ -1115,8 +1115,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   // [색 줄][아바타][이름·메시지] 3칸 행. 색 줄은 캐릭터 배경색이라, 사진을 넣어도 캐릭터 색이 남아요.
   function copyMsgRow(barColor, avatarHtml, headerHtml, bodyHtml, italic) {
     return '<tr>' +
-      '<td width="4" style="width:4px;background:' + barColor + ';border:none;padding:0;font-size:1px;line-height:1px;">&nbsp;</td>' +
-      '<td width="44" valign="top" style="width:44px;border:none;padding:3px 0 0 7px;text-align:center;">' + avatarHtml + '</td>' +
+      '<td width="3" style="width:3px;background:' + barColor + ';border:none;padding:0;font-size:1px;line-height:1px;">&nbsp;</td>' +
+      '<td width="46" valign="top" style="width:46px;border:none;padding:3px 0 0 6px;text-align:center;">' + avatarHtml + '</td>' +
       '<td valign="top" style="border:none;padding:2px 0 12px 10px;' + COPY_FONT + '">' +
         '<div style="font-size:14px;line-height:1.5;">' + headerHtml + '</div>' +
         '<div style="font-size:14px;line-height:1.55;color:#222;' + (italic ? 'font-style:italic;' : '') + '">' + bodyHtml + '</div>' +
@@ -1300,7 +1300,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     // 메시지 행들을 표 하나로 감싸요 (메시지마다 표를 따로 만들면 에디터가 사이에 빈 줄을 넣어요).
     // 가로 100%로 늘려 감정표현·시스템 행이 페이지 중앙에 오게 하고, colgroup으로 아바타 칸 폭을 고정해요.
     const htmlContent = '<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:none;width:100%;table-layout:fixed;' + COPY_FONT + '">' +
-      '<colgroup><col style="width:5px;"><col style="width:44px;"><col></colgroup><tbody>' +
+      '<colgroup><col style="width:3px;"><col style="width:46px;"><col></colgroup><tbody>' +
       filtered.map(buildLineHtml).join('') + '</tbody></table>';
     const plainText = filtered.map(buildPlainText).join('\n');
 
