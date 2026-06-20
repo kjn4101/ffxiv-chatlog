@@ -988,6 +988,31 @@
 
   .crop-btns .btn { flex: 1; }
 
+  /* ---------- 푸터 ---------- */
+  .app-footer {
+    max-width: 1180px;
+    margin: 40px auto 0;
+    padding-top: 20px;
+    border-top: 1px solid var(--border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+
+  .app-footer .footer-sep { opacity: 0.5; }
+
+  .app-footer a {
+    color: var(--cyan);
+    text-decoration: none;
+    border-bottom: 1px dotted currentColor;
+    transition: color 0.2s var(--ease);
+  }
+
+  .app-footer a:hover { color: var(--aether); }
+
   /* ---------- 모션 최소화 선호 존중 ---------- */
   @media (prefers-reduced-motion: reduce) {
     * {
