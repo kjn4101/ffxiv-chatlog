@@ -798,7 +798,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     m = rest.match(/^\[([^\]]+)\]\s*(.*)$/);
     if (m) return { channelType: 'system', channel: m[1].trim(), nickname: '', message: m[2] };
 
-    m = rest.match(/^([^:：]+)[:：]\s?(.*)$/);
+    // 닉네임에는 공백이 없으므로, 콜론 '앞 첫 단어'에 공백이 없을 때만 대사로 봐요.
+    // (예: "오케스트리온 악보: …"처럼 콜론 앞에 공백이 있으면 대사가 아니라 시스템 로그로 넘어가요.)
+    m = rest.match(/^([^\s:：]+)[:：]\s?(.*)$/);
     if (m) return { channelType: 'say', channel: '말하기', nickname: stripDecoration(m[1]), message: m[2] };
 
     return { channelType: 'unknown', channel: '', nickname: '', message: rest, unparsed: true };
