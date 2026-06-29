@@ -755,6 +755,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       if (!rest.startsWith(c.nick)) continue;
       const after = rest.slice(c.nick.length);
       if (after === '' || after[0] === ':' || after[0] === '：') continue; // 닉네임만/대사 → 감표 아님
+      // "○○ 님이 …"(공백 뒤 '님')은 게임 시스템 존댓말 로그 → 감표 아님(parseRest로).
+      if (/^\s+님/.test(after)) continue;
+      // "○○님 …"(공백 없이 바로 '님')은 사용자 표현이라 감표로 봐요.
+      if (after.startsWith('님')) {
+        return { channelType: 'emote', channel: '감정표현', nickname: c.nick, message: rest };
+      }
 
       // 1) 닉네임 바로 뒤가 공백·문장부호 → 사용자 지정 감표("○○ 웃는다", "○○. ---한다")
       if (EMOTE_BOUNDARY.test(after)) {
