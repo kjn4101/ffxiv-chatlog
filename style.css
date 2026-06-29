@@ -824,6 +824,15 @@
     word-break: break-word;
   }
 
+  /* 이름·채널이 없을 때: 메시지와 시간을 한 줄에 둬 말풍선이 세로로 얇게 보이게. */
+  .log-inline-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  .log-inline-row .log-message { flex: 1 1 auto; min-width: 0; }
+  .log-inline-row .log-time { flex: 0 0 auto; }
+
   /* 감정표현(나래이션) — 알약은 가운데, 시간은 오른쪽 끝(시스템과 동일) */
   .log-line.is-emote { display: block; }
 

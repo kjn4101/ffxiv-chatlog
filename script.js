@@ -1008,6 +1008,32 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return line;
   }
 
+  // 말풍선에 메타(이름·채널)·메시지·시간을 채워요.
+  // - 이름/채널이 있으면: 메타 줄(이름·채널·시간) + 메시지 (기존 모양)
+  // - 이름·채널이 모두 없고 시간만 있으면: 메시지와 시간을 '한 줄'에 둬서 말풍선이 세로로 얇아져요.
+  // - 아무것도 없으면: 메시지만.
+  function fillBubble(bubble, meta, msg, timeText) {
+    const mkTime = () => {
+      const s = document.createElement('span');
+      s.className = 'log-time';
+      s.textContent = timeText;
+      return s;
+    };
+    if (meta.childNodes.length > 0) {
+      if (timeText) meta.appendChild(mkTime());
+      bubble.appendChild(meta);
+      bubble.appendChild(msg);
+    } else if (timeText) {
+      const row = document.createElement('div');
+      row.className = 'log-inline-row';
+      row.appendChild(msg);
+      row.appendChild(mkTime());
+      bubble.appendChild(row);
+    } else {
+      bubble.appendChild(msg);
+    }
+  }
+
   // 귓속말은 사적인 느낌이 나도록 반투명·이탤릭으로 조용하게 표시해요.
   // 보낸 귓속말은 '내 캐릭터' 이름으로 왼쪽에, 받은 귓속말은 상대 아바타를 오른쪽에 두고 우측 정렬해요.
   function buildWhisperNode(entry) {
@@ -1062,18 +1088,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       meta.appendChild(tagSpan);
     }
 
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'log-time';
-    timeSpan.textContent = entry.time;
-    if (entry.time && shouldShowTime()) meta.appendChild(timeSpan);
-
-    // 이름·귓속말 라벨·시간이 모두 꺼지면 메타가 비니, 비었을 땐 말풍선에 넣지 않아요.
-    if (meta.childNodes.length > 0) bubble.appendChild(meta);
-
     const msg = document.createElement('div');
     msg.className = 'log-message';
     msg.innerHTML = escapeHtml(entry.message).replace(/\n/g, '<br>');
-    bubble.appendChild(msg);
+
+    fillBubble(bubble, meta, msg, (entry.time && shouldShowTime()) ? entry.time : '');
 
     line.appendChild(bubble);
     return line;
@@ -1211,18 +1230,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         meta.appendChild(chSpan);
       }
 
-      const timeSpan = document.createElement('span');
-      timeSpan.className = 'log-time';
-      timeSpan.textContent = entry.time;
-      if (entry.time && shouldShowTime()) meta.appendChild(timeSpan);
-
-      // 이름·채널·시간이 모두 숨겨져 메타가 비면 윗 여백만 남으니 메시지만 깔끔히 보여줘요.
-      if (meta.childNodes.length > 0) bubble.appendChild(meta);
-
       const msg = document.createElement('div');
       msg.className = 'log-message';
       msg.innerHTML = escapeHtml(entry.message).replace(/\n/g, '<br>');
-      bubble.appendChild(msg);
+
+      fillBubble(bubble, meta, msg, (entry.time && shouldShowTime()) ? entry.time : '');
 
       line.appendChild(bubble);
       preview.appendChild(line);
