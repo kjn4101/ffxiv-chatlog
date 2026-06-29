@@ -821,8 +821,19 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   const TIME_RE = /^\[(\d{1,2}:\d{2}(?::\d{2})?)\]/;
 
+  // FFXIV 로그를 복붙하면 게임 전용 글리프가 '사설영역(PUA)' 문자로 들어와 □/깨진 모양으로 보여요.
+  // 이런 깨져 보이는 특수문자만 골라 제거해요. 일반 글자·공백(정렬용)·작은따옴표·이모지는 보존해요.
+  function sanitizeLogText(text) {
+    return (text || '')
+      .replace(/[\uE000-\uF8FF]/g, '')                // 사설영역(게임 아이콘 글리프)
+      .replace(/[\uDB80-\uDBFF][\uDC00-\uDFFF]/g, '') // 보충 사설영역(플레인 15·16)
+      .replace(/[\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/g, '') // 제로폭·방향제어·BOM
+      .replace(/\uFFFD/g, '')                         // 인코딩 깨짐 표시
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, ''); // 제어문자(개행·탭 제외)
+  }
+
   function parseLog(text) {
-    const lines = text.split(/\r?\n/);
+    const lines = sanitizeLogText(text).split(/\r?\n/);
     // 로그에 시간 표기가 하나라도 있으면 '시간 표시 켜짐' 모드로 봐요. 이때는 [HH:MM]이 없는 줄을
     // 직전 메시지의 줄바꿈 연결로 처리하지만, 시간 표기가 아예 없는 로그(시간 표시 꺼짐)에서는
     // 모든 줄에 시간이 없으니 이 규칙을 끄지 않으면 시스템 로그가 앞 줄에 흡수돼버려요.
