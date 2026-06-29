@@ -1123,7 +1123,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
     const msg = document.createElement('span');
     msg.className = 'log-system-msg';
-    msg.innerHTML = escapeHtml(entry.message).replace(/\n/g, '<br>');
+    // 시스템 로그에 등장하는 등록 닉네임도 표시 이름으로 바꿔줘요.
+    msg.innerHTML = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
     center.appendChild(msg);
     inner.appendChild(center);
 
@@ -1370,10 +1371,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const timeHtml = timeLabel ? escapeHtml(timeLabel) : '';
     const metaStyle = 'color:#999;font-size:12px;';
 
-    // 시스템 알림: 가운데 정렬, 시간은 오른쪽 칸. 색은 설정값.
+    // 시스템 알림: 가운데 정렬, 시간은 오른쪽 칸. 색은 설정값. 등록 닉네임은 표시 이름으로.
     if (isSystem) {
       const tag = (entry.channel && entry.channelType === 'system') ? escapeHtml(entry.channel) + ' · ' : '';
-      return copyCenterRow(tag + messageHtml, 'color:' + settings.sysColor + ';font-size:12px;', timeHtml, settings.sysColor);
+      const sysHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
+      return copyCenterRow(tag + sysHtml, 'color:' + settings.sysColor + ';font-size:12px;', timeHtml, settings.sysColor);
     }
 
     // 감정표현: 가운데 정렬 이탤릭, 시간은 오른쪽 칸 (나래이션이라 아바타·이름 없이 본문만)
@@ -1440,12 +1442,13 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const time = (entry.time && shouldShowTime()) ? entry.time : '';
     const msgHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
 
-    // 시스템 알림 (시간은 뒤=오른쪽, 색은 설정값)
+    // 시스템 알림 (시간은 뒤=오른쪽, 색은 설정값). 등록 닉네임은 표시 이름으로.
     if (isSystem) {
       const t = time ? ' <span style="font-size:11px;opacity:0.7;margin-left:6px;">' + escapeHtml(time) + '</span>' : '';
       const tag = (entry.channel && entry.channelType === 'system')
         ? '<span style="font-size:10.5px;color:#a8843f;border:1px solid #2c3648;border-radius:4px;padding:0 5px;margin-right:6px;">' + escapeHtml(entry.channel) + '</span>' : '';
-      return '<div style="text-align:center;color:' + settings.sysColor + ';font-size:12px;margin-bottom:10px;">' + tag + msgHtml + t + '</div>';
+      const sysHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
+      return '<div style="text-align:center;color:' + settings.sysColor + ';font-size:12px;margin-bottom:10px;">' + tag + sysHtml + t + '</div>';
     }
 
     // 감정표현 (나래이션이라 아바타 없이 본문만)
@@ -1516,7 +1519,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return timeLabel + applyDisplayNames(entry.message);
     }
     if (isSystem) {
-      return timeLabel + entry.message;
+      return timeLabel + applyDisplayNames(entry.message);
     }
 
     const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
