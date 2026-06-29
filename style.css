@@ -916,6 +916,29 @@
     opacity: 0.9;
   }
 
+  /* 감표 ⇄ 시스템 수동 전환 버튼 — 줄에 마우스를 올렸을 때만 살짝 나타나요(미리보기 전용). */
+  .log-line.has-swap { position: relative; }
+
+  .log-swap-btn {
+    position: absolute;
+    top: 2px;
+    left: 4px;
+    z-index: 2;
+    padding: 1px 7px;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    background: rgba(20, 26, 38, 0.92);
+    border: 1px solid var(--border-soft);
+    border-radius: 5px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.12s ease;
+  }
+
+  .log-line.has-swap:hover .log-swap-btn { opacity: 0.85; }
+  .log-swap-btn:hover { opacity: 1; color: var(--cyan); }
+
   /* ---------- 사진 크롭 편집기 ---------- */
   .crop-overlay {
     position: fixed;

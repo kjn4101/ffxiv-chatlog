@@ -372,6 +372,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   let narrowToLog = true;
   let charSearchQuery = '';
   let hiddenSectionOpen = false; // '숨긴 캐릭터' 접이식 섹션 펼침 여부
+  // 미리보기에서 감표↔시스템으로 직접 바꾼 줄: 원문(raw) → 'emote' | 'system'. 새로고침하면 초기화돼요.
+  const swapOverrides = new Map();
 
   function computePresentCharIds(logText) {
     const ids = new Set();
@@ -716,17 +718,58 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return stripServerSuffix(cleaned);
   }
 
+  // 감정표현(나래이션)은 등록된 닉네임으로 시작하는 줄이에요. 게임 기본 감표("○○가 인사한다"),
+  // 조사가 다른 경우("○○를/은/는…"), 사용자 지정 감표("○○ 행복하게 웃는다", "○○. ---한다")까지
+  // 폭넓게 잡아요. 단:
+  //   - 대사("○○: 안녕")는 닉네임 뒤에 ':'가 오므로 감표가 아니에요.
+  //   - 시스템 메시지("○○님이 파티에 참가하셨습니다")는 닉네임 뒤에 '님'(조사 아님)이 붙어
+  //     아래 경계 검사에 안 걸리므로 자연히 감표에서 빠져 시스템 줄로 처리돼요.
+  // 한글 조사 목록 — 긴 조사부터 적어 "이랑"이 "이"로 잘못 끊기지 않게 해요.
+  const EMOTE_PARTICLES = ['에게서', '이랑', '에게', '께서', '에서', '으로', '이', '가', '은', '는',
+    '을', '를', '와', '과', '도', '만', '의', '랑', '께', '에', '로'];
+  // 닉네임/조사 바로 뒤에 와도 되는 '경계' 문자(공백·문장부호). 이게 와야 더 긴 이름의 일부를
+  // 감표로 오인("민" + "수가…")하지 않아요.
+  const EMOTE_BOUNDARY = /^[\s.,!?~…·"'\-]/;
+
   function tryParseEmote(rest) {
     const sorted = characters
       .map(c => ({ nick: normalizeNick(c.nickname) }))
       .filter(c => c.nick)
       .sort((a, b) => b.nick.length - a.nick.length);
     for (const c of sorted) {
-      if (rest.startsWith(c.nick + '가 ') || rest.startsWith(c.nick + '이 ')) {
+      if (!rest.startsWith(c.nick)) continue;
+      const after = rest.slice(c.nick.length);
+      if (after === '' || after[0] === ':' || after[0] === '：') continue; // 닉네임만/대사 → 감표 아님
+
+      // 1) 닉네임 바로 뒤가 공백·문장부호 → 사용자 지정 감표("○○ 웃는다", "○○. ---한다")
+      if (EMOTE_BOUNDARY.test(after)) {
         return { channelType: 'emote', channel: '감정표현', nickname: c.nick, message: rest };
       }
+      // 2) 닉네임 뒤에 한글 조사 + 경계(공백·문장부호·줄 끝) → 기본 감표("○○이 인사한다")
+      for (const p of EMOTE_PARTICLES) {
+        if (after.startsWith(p)) {
+          const tail = after.slice(p.length);
+          if (tail === '' || EMOTE_BOUNDARY.test(tail)) {
+            return { channelType: 'emote', channel: '감정표현', nickname: c.nick, message: rest };
+          }
+        }
+      }
+      // 경계 없이 다른 한글이 이어지면(님이…, 더 긴 이름의 일부 등) 감표 아님 → parseRest로 넘겨요.
     }
     return null;
+  }
+
+  // 메시지 맨 앞에 등장하는 '등록된 닉네임'을 찾아요(감표↔시스템 스왑 시 알약 색을 살리려고).
+  function leadingRegisteredNick(text) {
+    const t = text || '';
+    const sorted = characters
+      .map(c => normalizeNick(c.nickname))
+      .filter(Boolean)
+      .sort((a, b) => b.length - a.length);
+    for (const n of sorted) {
+      if (t.startsWith(n)) return n;
+    }
+    return '';
   }
 
   function parseRest(rest) {
@@ -759,15 +802,21 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return { channelType: 'unknown', channel: '', nickname: '', message: rest, unparsed: true };
   }
 
+  const TIME_RE = /^\[(\d{1,2}:\d{2}(?::\d{2})?)\]/;
+
   function parseLog(text) {
     const lines = text.split(/\r?\n/);
+    // 로그에 시간 표기가 하나라도 있으면 '시간 표시 켜짐' 모드로 봐요. 이때는 [HH:MM]이 없는 줄을
+    // 직전 메시지의 줄바꿈 연결로 처리하지만, 시간 표기가 아예 없는 로그(시간 표시 꺼짐)에서는
+    // 모든 줄에 시간이 없으니 이 규칙을 끄지 않으면 시스템 로그가 앞 줄에 흡수돼버려요.
+    const anyTimed = lines.some(l => TIME_RE.test(l));
     const entries = [];
     for (const line of lines) {
       if (line.trim() === '') continue;
 
       let time = '';
       let rest = line;
-      const timeMatch = line.match(/^\[(\d{1,2}:\d{2}(?::\d{2})?)\]/);
+      const timeMatch = line.match(TIME_RE);
       if (timeMatch) {
         time = timeMatch[1];
         rest = line.slice(timeMatch[0].length);
@@ -781,15 +830,32 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
       const parsed = parseRest(rest);
 
-      // 시간 표시가 꺼져 있어서 [HH:MM]이 없고, 채널/닉네임 패턴도 못 알아본 줄은
-      // 직전 메시지가 줄바꿈으로 이어진 것으로 보고 합쳐줘요.
-      if (parsed.unparsed && !timeMatch && entries.length > 0) {
+      // 시간 표시가 켜진 로그에서 [HH:MM]이 없고 채널/닉네임 패턴도 못 알아본 줄은
+      // 직전 메시지가 줄바꿈으로 이어진 것으로 보고 합쳐줘요. (시간 표기 자체가 없는 로그는 제외)
+      if (parsed.unparsed && !timeMatch && anyTimed && entries.length > 0) {
         entries[entries.length - 1].message += '\n' + line;
       } else {
         entries.push(Object.assign({ time, raw: line }, parsed));
       }
     }
+    // 사용자가 미리보기에서 감표↔시스템으로 직접 바꾼 줄을 반영해요.
+    entries.forEach(applySwapOverride);
     return entries;
+  }
+
+  // 감표↔시스템 수동 전환을 적용해요. 감표/시스템 줄에만 의미가 있어요.
+  function applySwapOverride(entry) {
+    const ov = swapOverrides.get(entry.raw);
+    if (!ov) return;
+    if (ov === 'emote' && entry.channelType !== 'emote') {
+      entry.channelType = 'emote';
+      entry.channel = '감정표현';
+      entry.nickname = leadingRegisteredNick(entry.message); // 알약 색을 위해 행위자 추정
+    } else if (ov === 'system' && entry.channelType === 'emote') {
+      entry.channelType = 'system';
+      entry.channel = '';
+      entry.nickname = ''; // 시스템 줄은 닉네임 없이 가운데 정렬로 표시돼요.
+    }
   }
 
   function escapeHtml(str) {
@@ -810,6 +876,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   function shouldShowTime() {
     return document.getElementById('showTimeToggle').checked;
+  }
+
+  function shouldShowName() {
+    return document.getElementById('showNameToggle').checked;
   }
 
   function renderChannelFilter(entries) {
@@ -973,14 +1043,18 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const senderName = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
     const receiverName = isOut ? nickToDisplay(entry.recipient) : myDisplayName();
 
-    const nameSpan = document.createElement('span');
-    nameSpan.className = 'log-name';
-    nameSpan.textContent = senderName;
-    meta.appendChild(nameSpan);
-
     const tagSpan = document.createElement('span');
     tagSpan.className = 'log-whisper-tag';
-    tagSpan.textContent = '→ ' + receiverName;
+    if (shouldShowName()) {
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'log-name';
+      nameSpan.textContent = senderName;
+      meta.appendChild(nameSpan);
+      tagSpan.textContent = '→ ' + receiverName;
+    } else {
+      // 이름 숨김: 누구→누구 대신 조용히 '귓속말'만 표시해요.
+      tagSpan.textContent = '귓속말';
+    }
     meta.appendChild(tagSpan);
 
     const timeSpan = document.createElement('span');
@@ -1042,6 +1116,24 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return line;
   }
 
+  // 감표/시스템 줄에 '감표로 ⇄ 시스템으로' 전환 버튼을 달아줘요. 줄에 마우스를 올리면 나타나고,
+  // 이미지 저장(html2canvas)·서식/텍스트 복사에는 들어가지 않아요(미리보기 DOM에만 있는 요소).
+  function addSwapButton(lineNode, entry) {
+    const toEmote = entry.channelType !== 'emote'; // 지금이 시스템이면 감표로, 감표면 시스템으로
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'log-swap-btn';
+    btn.textContent = toEmote ? '감표로' : '시스템으로';
+    btn.title = toEmote ? '이 줄을 감정표현으로 바꾸기' : '이 줄을 시스템 로그로 바꾸기';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      swapOverrides.set(entry.raw, toEmote ? 'emote' : 'system');
+      renderPreview();
+    });
+    lineNode.classList.add('has-swap');
+    lineNode.appendChild(btn);
+  }
+
   function renderPreview() {
     const text = document.getElementById('logInput').value;
     const filtered = getFilteredEntries(text);
@@ -1052,18 +1144,23 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     filtered.forEach(entry => {
       const char = findCharacterByNickname(entry.nickname);
       const isEmote = entry.channelType === 'emote';
-      const isSystem = !entry.nickname;
+      // 감표(스왑으로 닉네임이 비었을 수도 있음)를 먼저 가려내고, 그 외 닉네임 없는 줄을 시스템으로.
+      const isSystem = !isEmote && !entry.nickname;
 
       if (entry.channelType === 'whisper-out' || entry.channelType === 'whisper-in') {
         preview.appendChild(buildWhisperNode(entry));
         return;
       }
-      if (isSystem) {
-        preview.appendChild(buildSystemLineNode(entry));
+      if (isEmote) {
+        const node = buildEmoteLineNode(entry, char);
+        addSwapButton(node, entry);
+        preview.appendChild(node);
         return;
       }
-      if (isEmote) {
-        preview.appendChild(buildEmoteLineNode(entry, char));
+      if (isSystem) {
+        const node = buildSystemLineNode(entry);
+        addSwapButton(node, entry);
+        preview.appendChild(node);
         return;
       }
 
@@ -1094,10 +1191,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const meta = document.createElement('div');
       meta.className = 'log-meta';
 
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'log-name';
-      nameSpan.textContent = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
-      meta.appendChild(nameSpan);
+      if (shouldShowName()) {
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'log-name';
+        nameSpan.textContent = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
+        meta.appendChild(nameSpan);
+      }
 
       if (entry.channel && shouldShowChannel()) {
         const chSpan = document.createElement('span');
@@ -1111,7 +1210,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       timeSpan.textContent = entry.time;
       if (entry.time && shouldShowTime()) meta.appendChild(timeSpan);
 
-      bubble.appendChild(meta);
+      // 이름·채널·시간이 모두 숨겨져 메타가 비면 윗 여백만 남으니 메시지만 깔끔히 보여줘요.
+      if (meta.childNodes.length > 0) bubble.appendChild(meta);
 
       const msg = document.createElement('div');
       msg.className = 'log-message';
@@ -1156,7 +1256,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     node.style.maxHeight = 'none';
     node.style.overflow = 'visible';
 
-    html2canvas(node, { backgroundColor: settings.bgColor, scale }).then(full => {
+    html2canvas(node, {
+      backgroundColor: settings.bgColor,
+      scale,
+      ignoreElements: el => el.classList && el.classList.contains('log-swap-btn')
+    }).then(full => {
       restore();
       let out = full;
       if (cropToView) {
@@ -1239,7 +1343,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const char = findCharacterByNickname(entry.nickname);
     const isEmote = entry.channelType === 'emote';
     const isWhisper = entry.channelType === 'whisper-out' || entry.channelType === 'whisper-in';
-    const isSystem = !entry.nickname && !isWhisper;
+    const isSystem = !entry.nickname && !isWhisper && !isEmote;
     const messageHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
     const timeLabel = (entry.time && shouldShowTime()) ? entry.time : '';
     const timeHtml = timeLabel ? escapeHtml(timeLabel) : '';
@@ -1262,8 +1366,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const isOut = entry.channelType === 'whisper-out';
       const wChar = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
       const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
-      const meta = ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), '귓속말'].filter(Boolean).join(' · ');
-      const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b> <span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>';
+      const meta = shouldShowName()
+        ? ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), '귓속말'].filter(Boolean).join(' · ')
+        : '귓속말';
+      const header = shouldShowName()
+        ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b> <span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>'
+        : '<span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>';
       const fallback = isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?');
       return copyMsgRow(wChar ? wChar.bg : '#cccccc', copyAvatarCellHtml(wChar, fallback), header, messageHtml, true, timeHtml);
     }
@@ -1271,8 +1379,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     // 일반 대화: 색 줄 + 아바타 + 이름(굵게), 시간은 오른쪽 칸
     const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
     const channelLabel = (entry.channel && shouldShowChannel()) ? '[' + entry.channel + ']' : '';
-    const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' +
-      (channelLabel ? ' <span style="' + metaStyle + '">' + escapeHtml(channelLabel) + '</span>' : '');
+    const namePart = shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' : '';
+    const channelPart = channelLabel ? '<span style="' + metaStyle + '">' + escapeHtml(channelLabel) + '</span>' : '';
+    const header = [namePart, channelPart].filter(Boolean).join(' ');
     return copyMsgRow(char ? char.bg : '#cccccc', copyAvatarCellHtml(char, (entry.nickname || '?').charAt(0) || '?'), header, messageHtml, false, timeHtml);
   }
 
@@ -1306,7 +1415,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const char = findCharacterByNickname(entry.nickname);
     const isEmote = entry.channelType === 'emote';
     const isWhisper = entry.channelType === 'whisper-out' || entry.channelType === 'whisper-in';
-    const isSystem = !entry.nickname && !isWhisper;
+    const isSystem = !entry.nickname && !isWhisper && !isEmote;
     const time = (entry.time && shouldShowTime()) ? entry.time : '';
     const msgHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
 
@@ -1337,9 +1446,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const bg = wChar ? darkenHex(wChar.bg, 0.22) : '#1c232e';
       const color = wChar ? wChar.color : '#e9e4d6';
       const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
-      const meta = ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), time].filter(Boolean).join(' ');
+      const meta = shouldShowName()
+        ? ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), time].filter(Boolean).join(' ')
+        : ['귓속말', time].filter(Boolean).join(' ');
       const av = richAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?'), 36, 0.72);
-      const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b> <span style="font-size:11px;opacity:0.7;">' + escapeHtml(meta) + '</span>';
+      const header = (shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b> ' : '') +
+        '<span style="font-size:11px;opacity:0.7;">' + escapeHtml(meta) + '</span>';
       return richRowHtml(av, bg, color, header, '<span style="font-style:italic;">' + msgHtml + '</span>', true);
     }
 
@@ -1350,7 +1462,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const ch = (entry.channel && shouldShowChannel()) ? ' <span style="font-size:11px;opacity:0.75;">[' + escapeHtml(entry.channel) + ']</span>' : '';
     const t = time ? ' <span style="font-size:11px;opacity:0.6;">' + escapeHtml(time) + '</span>' : '';
     const av = richAvatarHtml(char, (entry.nickname || '?').charAt(0) || '?', 36, 1);
-    const header = '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' + ch + t;
+    const nameHtml = shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' : '';
+    const header = (nameHtml + ch + t).trim();
     return richRowHtml(av, bg, color, header, msgHtml, false);
   }
 
@@ -1366,9 +1479,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const timeLabel = (entry.time && shouldShowTime()) ? '[' + entry.time + '] ' : '';
 
     if (entry.channelType === 'whisper-out') {
+      if (!shouldShowName()) return timeLabel + '(귓속말) ' + entry.message;
       return timeLabel + myDisplayName() + ' → ' + nickToDisplay(entry.recipient) + ' (귓속말): ' + entry.message;
     }
     if (entry.channelType === 'whisper-in') {
+      if (!shouldShowName()) return timeLabel + '(귓속말) ' + entry.message;
       return timeLabel + nickToDisplay(entry.nickname) + ' → ' + myDisplayName() + ' (귓속말): ' + entry.message;
     }
 
@@ -1382,6 +1497,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
     const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
     const channelLabel = (entry.channel && shouldShowChannel()) ? '[' + entry.channel + '] ' : '';
+    if (!shouldShowName()) return timeLabel + channelLabel + entry.message;
     return timeLabel + channelLabel + name + ': ' + entry.message;
   }
 
@@ -1549,6 +1665,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   document.getElementById('filterToggle').addEventListener('change', renderPreview);
   document.getElementById('showChannelToggle').addEventListener('change', renderPreview);
   document.getElementById('showTimeToggle').addEventListener('change', renderPreview);
+  document.getElementById('showNameToggle').addEventListener('change', renderPreview);
   document.getElementById('copyBtn').addEventListener('click', copyFormatted);
   document.getElementById('htmlCopyBtn').addEventListener('click', copyHtmlCode);
   document.getElementById('textCopyBtn').addEventListener('click', copyPlainText);
