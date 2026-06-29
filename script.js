@@ -1062,7 +1062,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       meta.appendChild(tagSpan);
     }
 
-    // 이름·귓속말 라벨이 모두 꺼지면 메타가 비니, 비었을 땐 말풍선에 넣지 않아요.
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'log-time';
+    timeSpan.textContent = entry.time;
+    if (entry.time && shouldShowTime()) meta.appendChild(timeSpan);
+
+    // 이름·귓속말 라벨·시간이 모두 꺼지면 메타가 비니, 비었을 땐 말풍선에 넣지 않아요.
     if (meta.childNodes.length > 0) bubble.appendChild(meta);
 
     const msg = document.createElement('div');
@@ -1071,15 +1076,6 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     bubble.appendChild(msg);
 
     line.appendChild(bubble);
-
-    // 시간은 말풍선 밖 오른쪽 끝으로 — 말풍선이 내용만큼 줄어들게.
-    if (entry.time && shouldShowTime()) {
-      const tOut = document.createElement('span');
-      tOut.className = 'log-time-out';
-      tOut.textContent = entry.time;
-      line.appendChild(tOut);
-    }
-
     return line;
   }
 
@@ -1215,8 +1211,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         meta.appendChild(chSpan);
       }
 
-      // 이름·채널이 모두 숨겨져 메타가 비면 윗 여백만 남으니 메시지만 깔끔히 보여줘요.
-      // (시간은 말풍선 밖 오른쪽 끝으로 빼서, 말풍선이 내용 크기만큼 예쁘게 줄어들게 해요.)
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'log-time';
+      timeSpan.textContent = entry.time;
+      if (entry.time && shouldShowTime()) meta.appendChild(timeSpan);
+
+      // 이름·채널·시간이 모두 숨겨져 메타가 비면 윗 여백만 남으니 메시지만 깔끔히 보여줘요.
       if (meta.childNodes.length > 0) bubble.appendChild(meta);
 
       const msg = document.createElement('div');
@@ -1225,14 +1225,6 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       bubble.appendChild(msg);
 
       line.appendChild(bubble);
-
-      if (entry.time && shouldShowTime()) {
-        const tOut = document.createElement('span');
-        tOut.className = 'log-time-out';
-        tOut.textContent = entry.time;
-        line.appendChild(tOut);
-      }
-
       preview.appendChild(line);
     });
 
