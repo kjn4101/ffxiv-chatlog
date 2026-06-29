@@ -822,6 +822,7 @@
     font-size: 14px;
     line-height: 1.6;
     word-break: break-word;
+    white-space: pre-wrap; /* 정렬용 연속 공백을 그대로 살려요. */
   }
 
   /* 이름·채널이 없을 때: 메시지와 시간을 한 줄에 둬 말풍선이 세로로 얇게 보이게. */
@@ -857,7 +858,7 @@
     box-shadow: 0 2px 14px rgba(0, 0, 0, 0.28);
   }
 
-  .log-emote-msg { font-weight: 500; word-break: break-word; }
+  .log-emote-msg { font-weight: 500; word-break: break-word; white-space: pre-wrap; }
 
   .log-emote-time {
     font-style: normal;
@@ -932,6 +933,7 @@
 
   .log-system-msg {
     opacity: 0.9;
+    white-space: pre-wrap;
   }
 
   /* 감표 ⇄ 시스템 수동 전환 버튼 — 줄에 마우스를 올렸을 때만 살짝 나타나요(미리보기 전용). */

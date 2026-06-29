@@ -347,7 +347,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   }
 
   // 감정표현 문장 안에 등장하는 등록된 닉네임을, 표시 이름이 지정돼 있으면 그 이름으로 바꿔요.
-  // (예: "카페르티가 섬가를 껴안습니다" → 표시 이름이 있으면 그 이름으로) 긴 닉네임부터 치환해
+  // (예: "A가 B를 껴안습니다" → 표시 이름이 있으면 그 이름으로) 긴 닉네임부터 치환해
   // 짧은 닉네임이 긴 닉네임의 일부를 잘못 바꾸는 일을 막아요.
   function applyDisplayNames(text) {
     let result = text;
@@ -359,6 +359,19 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       result = result.split(s.nick).join(s.disp);
     }
     return result;
+  }
+
+  // 시스템 로그에서 닉네임 뒤에 붙은 서버명을 떼어내요. (예: "D'펜리르 님이" → "D' 님이",
+  // "C초코보 님을" → "C 님을") 서버명 앞에 한 글자 이상 있고 뒤에 '님'이 올 때만 떼어
+  // "펜리르 님이"처럼 서버명과 같은 닉네임은 보존해요.
+  const SYSTEM_SERVER_RE = new RegExp('([^\\s])(' + SERVER_NAMES.join('|') + ')(?=\\s?님)', 'g');
+  function stripSystemServerNames(text) {
+    return (text || '').replace(SYSTEM_SERVER_RE, '$1');
+  }
+
+  // 시스템 로그 본문 정리: 서버명 제거 후 등록 닉네임을 표시 이름으로.
+  function formatSystemText(text) {
+    return applyDisplayNames(stripSystemServerNames(text));
   }
 
   /* ---------- 편집 목록/출력 선택용 세션 상태 ----------
@@ -1125,8 +1138,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
     const msg = document.createElement('span');
     msg.className = 'log-system-msg';
-    // 시스템 로그에 등장하는 등록 닉네임도 표시 이름으로 바꿔줘요.
-    msg.innerHTML = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
+    // 시스템 로그에 붙은 서버명을 떼고, 등록 닉네임은 표시 이름으로 바꿔줘요.
+    msg.innerHTML = escapeHtml(formatSystemText(entry.message)).replace(/\n/g, '<br>');
     center.appendChild(msg);
     inner.appendChild(center);
 
@@ -1342,7 +1355,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       '<td width="46" valign="middle" style="width:46px;border:none;padding:7px 0 7px 6px;text-align:center;">' + avatarHtml + '</td>' +
       '<td valign="middle" style="border:none;padding:7px 0 7px 10px;' + COPY_FONT + '">' +
         headerDiv +
-        '<div style="font-size:14px;line-height:1.55;color:#222;' + (italic ? 'font-style:italic;' : '') + '">' + bodyHtml + '</div>' +
+        '<div style="font-size:14px;line-height:1.55;color:#222;white-space:pre-wrap;' + (italic ? 'font-style:italic;' : '') + '">' + bodyHtml + '</div>' +
       '</td>' +
       (shouldShowTime() ? copyTimeCell(timeHtml) : '') +
     '</tr>';
@@ -1376,7 +1389,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     // 시스템 알림: 가운데 정렬, 시간은 오른쪽 칸. 색은 설정값. 등록 닉네임은 표시 이름으로.
     if (isSystem) {
       const tag = (entry.channel && entry.channelType === 'system') ? escapeHtml(entry.channel) + ' · ' : '';
-      const sysHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
+      const sysHtml = escapeHtml(formatSystemText(entry.message)).replace(/\n/g, '<br>');
       return copyCenterRow(tag + sysHtml, 'color:' + settings.sysColor + ';font-size:12px;', timeHtml, settings.sysColor);
     }
 
@@ -1432,7 +1445,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       av +
       '<div style="flex:1;border-radius:10px;padding:9px 12px;background:' + bg + ';color:' + color + ';' + border + '">' +
         '<div style="margin-bottom:3px;">' + header + '</div>' +
-        '<div style="font-size:14px;line-height:1.55;word-break:break-word;">' + body + '</div>' +
+        '<div style="font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap;">' + body + '</div>' +
       '</div></div>';
   }
 
@@ -1449,7 +1462,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const t = time ? ' <span style="font-size:11px;opacity:0.7;margin-left:6px;">' + escapeHtml(time) + '</span>' : '';
       const tag = (entry.channel && entry.channelType === 'system')
         ? '<span style="font-size:10.5px;color:#a8843f;border:1px solid #2c3648;border-radius:4px;padding:0 5px;margin-right:6px;">' + escapeHtml(entry.channel) + '</span>' : '';
-      const sysHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
+      const sysHtml = escapeHtml(formatSystemText(entry.message)).replace(/\n/g, '<br>');
       return '<div style="text-align:center;color:' + settings.sysColor + ';font-size:12px;margin-bottom:10px;">' + tag + sysHtml + t + '</div>';
     }
 
@@ -1521,7 +1534,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return timeLabel + applyDisplayNames(entry.message);
     }
     if (isSystem) {
-      return timeLabel + applyDisplayNames(entry.message);
+      return timeLabel + formatSystemText(entry.message);
     }
 
     const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
