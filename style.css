@@ -785,12 +785,27 @@
   }
 
   .log-bubble {
-    flex: 1;
+    /* 내용 크기만큼만 차지하게(grow 0) 해서 짧은 대사는 말풍선이 예쁘게 줄어들어요. */
+    flex: 0 1 auto;
+    align-self: flex-start;
     min-width: 0;
+    max-width: 100%;
     border-radius: 10px;
     padding: 10px 13px;
     background: var(--panel-raised);
     box-shadow: 0 1px 6px rgba(0, 0, 0, 0.22);
+  }
+
+  /* 말풍선 밖 오른쪽 끝에 붙는 시간 — 말풍선이 줄어들어도 시간은 항상 우측 정렬돼요. */
+  .log-time-out {
+    flex: 0 0 auto;
+    margin-left: auto;
+    align-self: flex-start;
+    padding-top: 3px;
+    font-size: 11px;
+    opacity: 0.6;
+    color: var(--text-secondary);
+    white-space: nowrap;
   }
 
   .log-meta {

@@ -732,6 +732,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   const EMOTE_BOUNDARY = /^[\s.,!?~…·"'\-]/;
 
   function tryParseEmote(rest) {
+    // "닉네임 >> 메시지"(받은 귓속말)는 닉네임으로 시작하지만 감표가 아니라 대사예요. parseRest로 넘겨요.
+    if (/^[^:：>]+>>/.test(rest)) return null;
     const sorted = characters
       .map(c => ({ nick: normalizeNick(c.nickname) }))
       .filter(c => c.nick)
@@ -1043,26 +1045,25 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const senderName = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
     const receiverName = isOut ? nickToDisplay(entry.recipient) : myDisplayName();
 
-    const tagSpan = document.createElement('span');
-    tagSpan.className = 'log-whisper-tag';
+    // 이름(보낸이→받은이)은 '이름 표시'에, '귓속말' 라벨은 채널 종류이므로 '채널 이름 표시'에 따라요.
     if (shouldShowName()) {
       const nameSpan = document.createElement('span');
       nameSpan.className = 'log-name';
       nameSpan.textContent = senderName;
       meta.appendChild(nameSpan);
-      tagSpan.textContent = '→ ' + receiverName;
-    } else {
-      // 이름 숨김: 누구→누구 대신 조용히 '귓속말'만 표시해요.
+      const dirSpan = document.createElement('span');
+      dirSpan.className = 'log-whisper-tag';
+      dirSpan.textContent = '→ ' + receiverName + (shouldShowChannel() ? ' · 귓속말' : '');
+      meta.appendChild(dirSpan);
+    } else if (shouldShowChannel()) {
+      const tagSpan = document.createElement('span');
+      tagSpan.className = 'log-whisper-tag';
       tagSpan.textContent = '귓속말';
+      meta.appendChild(tagSpan);
     }
-    meta.appendChild(tagSpan);
 
-    const timeSpan = document.createElement('span');
-    timeSpan.className = 'log-time';
-    timeSpan.textContent = entry.time;
-    if (entry.time && shouldShowTime()) meta.appendChild(timeSpan);
-
-    bubble.appendChild(meta);
+    // 이름·귓속말 라벨이 모두 꺼지면 메타가 비니, 비었을 땐 말풍선에 넣지 않아요.
+    if (meta.childNodes.length > 0) bubble.appendChild(meta);
 
     const msg = document.createElement('div');
     msg.className = 'log-message';
@@ -1070,6 +1071,15 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     bubble.appendChild(msg);
 
     line.appendChild(bubble);
+
+    // 시간은 말풍선 밖 오른쪽 끝으로 — 말풍선이 내용만큼 줄어들게.
+    if (entry.time && shouldShowTime()) {
+      const tOut = document.createElement('span');
+      tOut.className = 'log-time-out';
+      tOut.textContent = entry.time;
+      line.appendChild(tOut);
+    }
+
     return line;
   }
 
@@ -1205,12 +1215,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         meta.appendChild(chSpan);
       }
 
-      const timeSpan = document.createElement('span');
-      timeSpan.className = 'log-time';
-      timeSpan.textContent = entry.time;
-      if (entry.time && shouldShowTime()) meta.appendChild(timeSpan);
-
-      // 이름·채널·시간이 모두 숨겨져 메타가 비면 윗 여백만 남으니 메시지만 깔끔히 보여줘요.
+      // 이름·채널이 모두 숨겨져 메타가 비면 윗 여백만 남으니 메시지만 깔끔히 보여줘요.
+      // (시간은 말풍선 밖 오른쪽 끝으로 빼서, 말풍선이 내용 크기만큼 예쁘게 줄어들게 해요.)
       if (meta.childNodes.length > 0) bubble.appendChild(meta);
 
       const msg = document.createElement('div');
@@ -1219,6 +1225,14 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       bubble.appendChild(msg);
 
       line.appendChild(bubble);
+
+      if (entry.time && shouldShowTime()) {
+        const tOut = document.createElement('span');
+        tOut.className = 'log-time-out';
+        tOut.textContent = entry.time;
+        line.appendChild(tOut);
+      }
+
       preview.appendChild(line);
     });
 
@@ -1306,18 +1320,21 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return '<img src="' + url + '" width="36" height="36" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;">';
   }
 
-  // 오른쪽 끝 시간 칸 (시간 표시 켜진 경우에만)
+  // 오른쪽 끝 시간 칸 (시간 표시 켜진 경우에만). 대사 칸과 같이 세로 가운데로 맞춰요.
   function copyTimeCell(timeHtml) {
-    return '<td width="46" valign="top" style="width:46px;border:none;padding:3px 4px 0 4px;text-align:right;color:#999;font-size:11px;white-space:nowrap;">' + (timeHtml || '') + '</td>';
+    return '<td width="46" valign="middle" style="width:46px;border:none;padding:7px 4px 7px 4px;text-align:right;color:#999;font-size:11px;white-space:nowrap;">' + (timeHtml || '') + '</td>';
   }
 
   // [색 줄][아바타][이름·메시지]( [시간] ) 행. 색 줄은 캐릭터 배경색이라 사진을 넣어도 캐릭터 색이 남아요.
+  // 아바타·대사 칸을 valign=middle로 두고 위아래 여백을 대칭(7px)으로 맞춰, 대사가 아바타와 세로
+  // 가운데로 나란히 보이게 해요. 이름·채널이 없으면 머리글 줄을 아예 빼서 깔끔하게 가운데 맞춰요.
   function copyMsgRow(barColor, avatarHtml, headerHtml, bodyHtml, italic, timeHtml) {
+    const headerDiv = headerHtml ? '<div style="font-size:14px;line-height:1.5;">' + headerHtml + '</div>' : '';
     return '<tr>' +
       '<td width="3" style="width:3px;background:' + barColor + ';border:none;padding:0;font-size:1px;line-height:1px;">&nbsp;</td>' +
-      '<td width="46" valign="top" style="width:46px;border:none;padding:3px 0 0 6px;text-align:center;">' + avatarHtml + '</td>' +
-      '<td valign="top" style="border:none;padding:2px 0 12px 10px;' + COPY_FONT + '">' +
-        '<div style="font-size:14px;line-height:1.5;">' + headerHtml + '</div>' +
+      '<td width="46" valign="middle" style="width:46px;border:none;padding:7px 0 7px 6px;text-align:center;">' + avatarHtml + '</td>' +
+      '<td valign="middle" style="border:none;padding:7px 0 7px 10px;' + COPY_FONT + '">' +
+        headerDiv +
         '<div style="font-size:14px;line-height:1.55;color:#222;' + (italic ? 'font-style:italic;' : '') + '">' + bodyHtml + '</div>' +
       '</td>' +
       (shouldShowTime() ? copyTimeCell(timeHtml) : '') +
@@ -1366,12 +1383,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const isOut = entry.channelType === 'whisper-out';
       const wChar = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
       const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
-      const meta = shouldShowName()
-        ? ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), '귓속말'].filter(Boolean).join(' · ')
-        : '귓속말';
-      const header = shouldShowName()
-        ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b> <span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>'
-        : '<span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>';
+      const metaParts = [];
+      if (shouldShowName()) metaParts.push('→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()));
+      if (shouldShowChannel()) metaParts.push('귓속말'); // '귓속말'은 채널 표시에 따라요.
+      const meta = metaParts.join(' · ');
+      const header = (shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' : '') +
+        (meta ? (shouldShowName() ? ' ' : '') + '<span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>' : '');
       const fallback = isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?');
       return copyMsgRow(wChar ? wChar.bg : '#cccccc', copyAvatarCellHtml(wChar, fallback), header, messageHtml, true, timeHtml);
     }
@@ -1446,12 +1463,14 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const bg = wChar ? darkenHex(wChar.bg, 0.22) : '#1c232e';
       const color = wChar ? wChar.color : '#e9e4d6';
       const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
-      const meta = shouldShowName()
-        ? ['→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()), time].filter(Boolean).join(' ')
-        : ['귓속말', time].filter(Boolean).join(' ');
+      const metaParts = [];
+      if (shouldShowName()) metaParts.push('→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()));
+      if (shouldShowChannel()) metaParts.push('귓속말'); // '귓속말'은 채널 표시에 따라요.
+      if (time) metaParts.push(time);
+      const meta = metaParts.join(' ');
       const av = richAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?'), 36, 0.72);
       const header = (shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b> ' : '') +
-        '<span style="font-size:11px;opacity:0.7;">' + escapeHtml(meta) + '</span>';
+        (meta ? '<span style="font-size:11px;opacity:0.7;">' + escapeHtml(meta) + '</span>' : '');
       return richRowHtml(av, bg, color, header, '<span style="font-style:italic;">' + msgHtml + '</span>', true);
     }
 
@@ -1478,13 +1497,14 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const isSystem = !entry.nickname && entry.channelType !== 'whisper-out';
     const timeLabel = (entry.time && shouldShowTime()) ? '[' + entry.time + '] ' : '';
 
-    if (entry.channelType === 'whisper-out') {
-      if (!shouldShowName()) return timeLabel + '(귓속말) ' + entry.message;
-      return timeLabel + myDisplayName() + ' → ' + nickToDisplay(entry.recipient) + ' (귓속말): ' + entry.message;
-    }
-    if (entry.channelType === 'whisper-in') {
-      if (!shouldShowName()) return timeLabel + '(귓속말) ' + entry.message;
-      return timeLabel + nickToDisplay(entry.nickname) + ' → ' + myDisplayName() + ' (귓속말): ' + entry.message;
+    if (entry.channelType === 'whisper-out' || entry.channelType === 'whisper-in') {
+      const isOut = entry.channelType === 'whisper-out';
+      const wTag = shouldShowChannel() ? '(귓속말)' : ''; // '귓속말'은 채널 표시에 따라요.
+      if (!shouldShowName()) return timeLabel + (wTag ? wTag + ' ' : '') + entry.message;
+      const dir = isOut
+        ? myDisplayName() + ' → ' + nickToDisplay(entry.recipient)
+        : nickToDisplay(entry.nickname) + ' → ' + myDisplayName();
+      return timeLabel + dir + (wTag ? ' ' + wTag : '') + ': ' + entry.message;
     }
 
     // 감정표현은 본문에 행위자가 들어있고, 시스템은 이름·채널 라벨이 불필요해요.
