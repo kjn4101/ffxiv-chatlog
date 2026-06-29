@@ -862,8 +862,17 @@
   .log-emote-time {
     font-style: normal;
     font-size: 11px;
+    line-height: 1;
     opacity: 0.6;
     color: var(--text-secondary);
+  }
+
+  /* 감정표현 시간 칸을 알약 높이만큼 늘려, 그 안에서 시간을 세로 가운데로 정확히 맞춰요. */
+  .log-emote-line .log-system-timewrap {
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
   }
 
   /* 귓속말 — 사적으로 소근거리는 느낌. 캐릭터 색을 살짝 어둡게(그림자처럼)해 구분, 메시지는 이탤릭. */
