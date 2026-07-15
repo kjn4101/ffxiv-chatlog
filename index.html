@@ -6,19 +6,19 @@
 <title>FF14 로그 — 파판14 채팅로그 메이커</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="app-header">
-    <div class="crest"></div>
-    <div>
+    <div class="header-inner">
+      <div class="crest" aria-hidden="true"></div>
       <h1>FF14 로그</h1>
       <p class="subtitle">FFXIV 채팅 로그를 캐릭터별로 보기 좋게 정리하세요.</p>
     </div>
   </header>
   <div class="layout">
-    <aside class="panel">
+    <aside class="panel side-panel">
       <div class="panel-head">
         <h2>닉네임 설정</h2>
         <button id="resetBtn" class="reset-link" type="button">전체 초기화</button>
@@ -34,61 +34,90 @@
           <button id="hideAllChars" type="button">모두 숨김</button>
         </div>
       </div>
+      <div id="foundNicks" class="found-nicks" hidden>
+        <div class="found-nicks-title">이 로그에서 발견된 닉네임 — 클릭해서 등록</div>
+        <div id="foundNicksChips" class="found-nicks-chips"></div>
+      </div>
       <div id="charList"></div>
       <button id="addCharBtn" class="btn btn-ghost" type="button">+ 캐릭터 추가</button>
-      <div class="filter-row">
-        <label class="switch-label">
-          <input type="checkbox" id="filterToggle" checked>
-          등록된 닉네임만 표시
-        </label>
-        <label class="switch-label" style="margin-top: 10px;">
-          <input type="checkbox" id="showChannelToggle" checked>
-          [자유부대]/[파티] 같은 채널 이름 표시
-        </label>
-        <label class="switch-label" style="margin-top: 10px;">
-          <input type="checkbox" id="showTimeToggle" checked>
-          시간 표시
-        </label>
-        <label class="switch-label" style="margin-top: 10px;">
-          <input type="checkbox" id="showNameToggle" checked>
-          대사창에 이름(닉네임) 표시
-        </label>
-        <div class="bg-color-row">
-          <label><span class="color-label-text">로그 배경색</span><input type="color" id="logBgColor"></label>
-          <button id="logBgReset" type="button">기본값</button>
-        </div>
-        <div class="bg-color-row">
-          <label><span class="color-label-text">시스템 글자색</span><input type="color" id="sysColor"></label>
-          <button id="sysColorReset" type="button">기본값</button>
-        </div>
-        <div class="channel-filter-heading">채널 필터 (체크한 채널만 표시됩니다)</div>
-        <div id="channelFilterList" class="channel-filter-group">
-          <p class="char-empty-hint">로그 변환을 시도하면 채널 목록이 하단에 나타납니다.</p>
-        </div>
-      </div>
     </aside>
-    <section class="panel">
-      <h2>로그 입력</h2>
-      <textarea id="logInput" placeholder="여기에 채팅 로그를 붙여넣으세요"></textarea>
-      <div class="actions">
-        <button id="copyBtn" class="btn btn-cyan-outline" type="button">서식 복사하기</button>
-        <button id="htmlCopyBtn" class="btn btn-cyan-outline" type="button">HTML 코드 복사</button>
-        <button id="textCopyBtn" class="btn btn-outline" type="button">텍스트만 복사</button>
-        <button id="exportFullBtn" class="btn btn-gold" type="button">전체 이미지 저장</button>
-        <button id="exportViewBtn" class="btn btn-gold" type="button">보이는 부분 저장</button>
-        <button id="clearBtn" class="btn btn-outline" type="button">지우기</button>
+    <section class="panel main-panel">
+      <div class="panel-head">
+        <h2>로그 입력</h2>
+        <button id="clearBtn" class="reset-link" type="button">입력 지우기</button>
       </div>
-      <p class="export-note">* 서식 복사하기는 색상과 아바타가 유지된 채로 복사되어, 카페 글쓰기 창이나 워드, 메일처럼 서식을 지원하는 곳에 적합합니다.<br>* HTML 코드 복사는 코드 자체를 복사하므로, 티스토리·블로그의 'HTML 편집' 모드에 붙여넣으면 미리보기 모습(둥근 말풍선 등)이 그대로 살아납니다.<br>* 텍스트만 복사는 디스코드나 메모장처럼 서식이 필요 없는 곳에 적합합니다.<br>* 미리보기 박스의 오른쪽 아래 모서리를 끌어 크기를 조절할 수 있고, '보이는 부분 저장'은 박스에 보이는 만큼만 캡처합니다.<br>* 감정표현 로그와 시스템 로그의 경우 커서를 올리면 스왑 버튼이 나타납니다. 필터에 잘못 걸렸을 시 해당 버튼을 통해 표시 스왑이 가능합니다.</p>
-      <div class="preview-toolbar">
-        <button id="resetPreviewSize" type="button">미리보기 크기 초기화</button>
+      <textarea id="logInput" placeholder="여기에 채팅 로그를 붙여넣으세요 — 붙여넣는 즉시 아래 미리보기로 변환됩니다"></textarea>
+
+      <div class="options-bar">
+        <div class="option-group">
+          <div class="option-group-title">표시 옵션</div>
+          <div class="option-toggles">
+            <label class="switch-label">
+              <input type="checkbox" id="filterToggle" checked>
+              등록된 닉네임만 표시
+            </label>
+            <label class="switch-label">
+              <input type="checkbox" id="showChannelToggle" checked>
+              채널 이름 표시
+            </label>
+            <label class="switch-label">
+              <input type="checkbox" id="showTimeToggle" checked>
+              시간 표시
+            </label>
+            <label class="switch-label">
+              <input type="checkbox" id="showNameToggle" checked>
+              이름(닉네임) 표시
+            </label>
+          </div>
+        </div>
+        <div class="option-group">
+          <div class="option-group-title">색상</div>
+          <div class="bg-color-row">
+            <label><span class="color-label-text">로그 배경색</span><input type="color" id="logBgColor"></label>
+            <button id="logBgReset" type="button">기본값</button>
+          </div>
+          <div class="bg-color-row">
+            <label><span class="color-label-text">시스템 글자색</span><input type="color" id="sysColor"></label>
+            <button id="sysColorReset" type="button">기본값</button>
+          </div>
+        </div>
+        <div class="option-group option-group-channels">
+          <div class="option-group-title">채널 필터<span class="option-group-hint"> — 체크한 채널만 표시</span></div>
+          <div id="channelFilterList" class="channel-filter-group">
+            <p class="char-empty-hint">로그를 붙여넣으면 채널 목록이 나타납니다.</p>
+          </div>
+        </div>
       </div>
+
       <div class="preview-frame">
-        <div class="preview-frame-corner tl"></div>
-        <div class="preview-frame-corner tr"></div>
-        <div class="preview-frame-corner bl"></div>
-        <div class="preview-frame-corner br"></div>
+        <div class="preview-titlebar">
+          <span class="preview-title-label">❯ log preview</span>
+          <button id="resetPreviewSize" type="button">크기 초기화</button>
+        </div>
         <div id="preview"><p class="empty-notice">로그를 붙여넣으면 자동으로 변환됩니다.</p></div>
+        <div class="preview-actions">
+          <div class="action-group">
+            <button id="copyBtn" class="btn btn-primary" type="button">서식 복사하기</button>
+            <button id="htmlCopyBtn" class="btn btn-cyan-outline" type="button">HTML 코드 복사</button>
+            <button id="textCopyBtn" class="btn btn-outline" type="button">텍스트만 복사</button>
+          </div>
+          <div class="action-group">
+            <button id="exportFullBtn" class="btn btn-gold" type="button">전체 이미지 저장</button>
+            <button id="exportViewBtn" class="btn btn-gold-outline" type="button">보이는 부분 저장</button>
+          </div>
+        </div>
       </div>
+
+      <details class="export-note">
+        <summary>복사·저장 방식 안내</summary>
+        <ul>
+          <li><b>서식 복사하기</b>는 색상과 아바타가 유지된 채로 복사되어, 카페 글쓰기 창이나 워드, 메일처럼 서식을 지원하는 곳에 적합합니다.</li>
+          <li><b>HTML 코드 복사</b>는 코드 자체를 복사하므로, 티스토리·블로그의 'HTML 편집' 모드에 붙여넣으면 미리보기 모습(둥근 말풍선 등)이 그대로 살아납니다.</li>
+          <li><b>텍스트만 복사</b>는 디스코드나 메모장처럼 서식이 필요 없는 곳에 적합합니다.</li>
+          <li>미리보기 박스의 오른쪽 아래 모서리를 끌어 크기를 조절할 수 있고, <b>보이는 부분 저장</b>은 박스에 보이는 만큼만 캡처합니다.</li>
+          <li>감정표현 로그와 시스템 로그의 경우 커서를 올리면 스왑 버튼이 나타납니다. 필터에 잘못 걸렸을 시 해당 버튼을 통해 표시 스왑이 가능합니다.</li>
+        </ul>
+      </details>
     </section>
   </div>
   <footer class="app-footer">

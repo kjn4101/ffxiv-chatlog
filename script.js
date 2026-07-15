@@ -42,6 +42,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   let settings = loadSettings();
   if (!settings.bgColor) settings.bgColor = DEFAULT_BG;
   if (!settings.sysColor) settings.sysColor = DEFAULT_SYS_COLOR;
+  // 잠시 쓰였던 웜톤 기본값이 저장돼 있으면 남색 기본값으로 되돌려요. 직접 고른 다른 색은 그대로 둡니다.
+  if (settings.bgColor === '#211d19') settings.bgColor = DEFAULT_BG;
+  if (settings.sysColor === '#a59d92') settings.sysColor = DEFAULT_SYS_COLOR;
 
   function saveSettings() {
     try {
@@ -66,6 +69,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     // 이모지 텍스트를 이미지와 별도로 기억해요. 그래야 사진이 있어도 이모지가 안 날아가요.
     if (c.emojiText === undefined) {
       c.emojiText = (c.avatarType === 'emoji') ? (c.avatarValue || '') : '';
+      migrated = true;
+    }
+    // 잠시 쓰였던 웜톤 말풍선 기본색이 그대로면 남색 기본색으로 되돌려요.
+    if (c.bg === '#38322b') {
+      c.bg = '#26303f';
       migrated = true;
     }
   });
@@ -385,6 +393,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   let narrowToLog = true;
   let charSearchQuery = '';
   let hiddenSectionOpen = false; // '숨긴 캐릭터' 접이식 섹션 펼침 여부
+  let expandedCharId = null; // 펼쳐서 편집 중인 캐릭터 행 — 아코디언(한 번에 하나만)
   // 미리보기에서 감표↔시스템으로 직접 바꾼 줄: 원문(raw) → 'emote' | 'system'. 새로고침하면 초기화돼요.
   const swapOverrides = new Map();
 
@@ -416,10 +425,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   /* ---------- 캐릭터 CRUD ---------- */
 
-  function addCharacter() {
+  // nickname을 넘기면 그 이름으로 미리 채워 등록해요('발견된 닉네임' 칩 원클릭 등록).
+  function addCharacter(nickname) {
     const c = {
       id: uid(),
-      nickname: '',
+      nickname: (typeof nickname === 'string') ? nickname : '',
       displayName: '',
       bg: '#26303f',
       color: '#e9e4d6',
@@ -429,8 +439,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     };
     characters.push(c);
     pinnedIds.add(c.id); // 새로 추가한 캐릭터는 narrowing 중에도 사라지지 않게 고정
+    expandedCharId = c.id; // 새 캐릭터는 펼친 채로 시작해 바로 입력으로 이어지게
     saveCharacters();
     renderCharList();
+    renderPreview(); // 닉네임이 미리 채워진 등록이면 미리보기·발견된 닉네임 칩이 바로 갱신돼요.
+    const firstInput = document.querySelector('.char-row[data-id="' + c.id + '"] .char-fields input');
+    if (firstInput) firstInput.focus();
   }
 
   function removeCharacter(id) {
@@ -453,10 +467,19 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const row = document.createElement('div');
       row.className = 'char-row';
       row.dataset.id = c.id;
+      const isOpen = expandedCharId === c.id;
+      if (isOpen) row.classList.add('open');
 
-      // 아바타 영역
-      const avatarWrap = document.createElement('div');
-      avatarWrap.className = 'avatar-edit';
+      /* ----- 머리줄 (항상 표시): 아바타 칩 + 이름 + [나] 배지 + 출력 토글 + 화살표 -----
+         아바타 칩이 배경색·글씨색·이모지를 그대로 보여줘서, 접혀 있어도 설정을 한눈에 알 수 있어요. */
+      const head = document.createElement('div');
+      head.className = 'char-head';
+
+      const summary = document.createElement('button');
+      summary.type = 'button';
+      summary.className = 'char-summary';
+      summary.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      summary.title = isOpen ? '접기' : '펼쳐서 편집';
 
       const avatarPreview = document.createElement('div');
       avatarPreview.className = 'avatar-preview';
@@ -468,7 +491,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         // 비어있으면 색상만 — 글씨/이모지를 넣었을 때만 표시
         avatarPreview.textContent = c.avatarValue || '';
       }
-      avatarWrap.appendChild(avatarPreview);
+      summary.appendChild(avatarPreview);
 
       // 아바타 미리보기를 현재 상태(이미지 우선 → 이모지 → 색상만)에 맞춰 다시 그려요.
       function refreshAvatarPreview() {
@@ -479,6 +502,60 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
           avatarPreview.textContent = c.emojiText || '';
         }
       }
+
+      // 머리줄 이름 — 표시 이름 → 닉네임 순서로 보여주고, 입력 중 실시간으로 갱신돼요.
+      const nameEl = document.createElement('span');
+      nameEl.className = 'char-name';
+      function refreshName() {
+        const label = c.displayName || c.nickname;
+        nameEl.textContent = label || '새 캐릭터';
+        nameEl.classList.toggle('is-placeholder', !label);
+      }
+      refreshName();
+      summary.appendChild(nameEl);
+
+      if (c.isMe) {
+        const badge = document.createElement('span');
+        badge.className = 'char-me-badge';
+        badge.textContent = '나';
+        summary.appendChild(badge);
+      }
+
+      const chevron = document.createElement('span');
+      chevron.className = 'char-chevron';
+      chevron.textContent = '▾';
+      summary.appendChild(chevron);
+
+      summary.addEventListener('click', () => {
+        expandedCharId = isOpen ? null : c.id;
+        renderCharList();
+      });
+      head.appendChild(summary);
+
+      // 출력 포함 여부 (세션 상태) — 자주 쓰는 토글이라 접힌 머리줄에 남겨둬요.
+      const outLabel = document.createElement('label');
+      outLabel.className = 'out-check';
+      outLabel.title = '끄면 이 캐릭터 대사가 미리보기·이미지·복사에서 빠져요.';
+      const outInput = document.createElement('input');
+      outInput.type = 'checkbox';
+      outInput.checked = !hiddenOutputIds.has(c.id);
+      outInput.addEventListener('change', () => {
+        if (outInput.checked) hiddenOutputIds.delete(c.id);
+        else hiddenOutputIds.add(c.id);
+        renderCharList(); // 숨김/표시에 따라 접이식 섹션으로 이동
+        renderPreview();
+      });
+      outLabel.appendChild(outInput);
+      outLabel.appendChild(document.createTextNode(' 출력'));
+      head.appendChild(outLabel);
+
+      row.appendChild(head);
+
+      /* ----- 본문 (펼쳤을 때만): 이름·색상·아바타·기타 설정 ----- */
+      const body = document.createElement('div');
+      body.className = 'char-body';
+      const bodyInner = document.createElement('div');
+      bodyInner.className = 'char-body-inner';
 
       const emojiInput = document.createElement('input');
       emojiInput.type = 'text';
@@ -498,7 +575,6 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         refreshAvatarPreview();
         renderPreview();
       });
-      avatarWrap.appendChild(emojiInput);
 
       const uploadLabel = document.createElement('label');
       uploadLabel.className = 'upload-btn';
@@ -522,7 +598,6 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         }
       });
       uploadLabel.appendChild(fileInput);
-      avatarWrap.appendChild(uploadLabel);
 
       // 사진 비우기 — 사진을 지우고, 이모지란에 적어둔 게 있으면 그걸로 아바타가 돌아가요.
       const clearPhotoBtn = document.createElement('button');
@@ -537,59 +612,90 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         refreshAvatarPreview();
         renderPreview();
       });
-      avatarWrap.appendChild(clearPhotoBtn);
 
-      row.appendChild(avatarWrap);
-
-      // 닉네임 / 표시이름 / 색상
+      // ----- 필드 그리드: 모든 줄을 [라벨 | 컨트롤]로 정렬해 한눈에 훑을 수 있게 -----
       const fields = document.createElement('div');
       fields.className = 'char-fields';
 
+      function fieldRow(labelText, ...controls) {
+        const line = document.createElement('div');
+        line.className = 'field-row';
+        const lab = document.createElement('span');
+        lab.className = 'field-label';
+        lab.textContent = labelText;
+        line.appendChild(lab);
+        controls.forEach(el => line.appendChild(el));
+        return line;
+      }
+
+      function fieldSep() {
+        const sep = document.createElement('div');
+        sep.className = 'field-sep';
+        return sep;
+      }
+
+      // 색·이름을 만지면 결과가 바로 보이는 작은 대사 미리보기 칩
+      const sample = document.createElement('div');
+      sample.className = 'char-sample';
+      const sampleName = document.createElement('span');
+      sampleName.className = 'char-sample-name';
+      const sampleMsg = document.createElement('span');
+      sampleMsg.className = 'char-sample-msg';
+      sampleMsg.textContent = '대사가 이렇게 보여요';
+      sample.appendChild(sampleName);
+      sample.appendChild(sampleMsg);
+      function refreshSample() {
+        sample.style.background = c.bg;
+        sample.style.color = c.color;
+        sampleName.textContent = c.displayName || c.nickname || '이름';
+      }
+      refreshSample();
+
       const nickInput = document.createElement('input');
       nickInput.type = 'text';
-      nickInput.placeholder = '게임 닉네임 (필수)';
+      nickInput.placeholder = '게임 속 닉네임 (필수)';
+      nickInput.setAttribute('aria-label', '게임 닉네임 (필수)');
       nickInput.value = c.nickname;
       nickInput.addEventListener('input', () => {
         updateCharacter(c.id, { nickname: nickInput.value });
+        refreshName(); // 머리줄 이름도 실시간 갱신
+        refreshSample();
         renderPreview();
       });
-      fields.appendChild(nickInput);
 
       const dispInput = document.createElement('input');
       dispInput.type = 'text';
-      dispInput.placeholder = '표시 이름 (공란 시 닉네임)';
+      dispInput.placeholder = '공란이면 닉네임 그대로';
+      dispInput.setAttribute('aria-label', '표시 이름');
       dispInput.value = c.displayName;
       dispInput.addEventListener('input', () => {
         updateCharacter(c.id, { displayName: dispInput.value });
+        refreshName(); // 머리줄 이름도 실시간 갱신
+        refreshSample();
         renderPreview();
       });
-      fields.appendChild(dispInput);
 
-      const bgLabel = document.createElement('label');
-      bgLabel.className = 'color-label';
-      bgLabel.textContent = '배경';
       const bgInput = document.createElement('input');
       bgInput.type = 'color';
       bgInput.value = c.bg;
+      bgInput.setAttribute('aria-label', '말풍선 배경색');
       bgInput.addEventListener('input', () => {
         updateCharacter(c.id, { bg: bgInput.value });
         avatarPreview.style.background = bgInput.value;
+        refreshSample();
         renderPreview();
       });
-      bgLabel.appendChild(bgInput);
 
-      const colorLabel = document.createElement('label');
-      colorLabel.className = 'color-label';
-      colorLabel.textContent = '글씨';
       const colorInput = document.createElement('input');
       colorInput.type = 'color';
       colorInput.value = c.color;
+      colorInput.setAttribute('aria-label', '말풍선 글씨색');
       colorInput.addEventListener('input', () => {
         updateCharacter(c.id, { color: colorInput.value });
         avatarPreview.style.color = colorInput.value;
+        refreshSample();
         renderPreview();
       });
-      colorLabel.appendChild(colorInput);
 
       // '내 캐릭터' 지정 — 내가 보낸 귓속말을 이 캐릭터 이름으로 표시해요. 한 명만 지정돼요.
       const meLabel = document.createElement('label');
@@ -610,57 +716,41 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       meLabel.appendChild(meInput);
       meLabel.appendChild(document.createTextNode(' 내 캐릭터'));
 
-      // 출력 포함 여부 (세션 상태) — 끄면 이 캐릭터 대사가 미리보기/이미지/복사에서 빠져요.
-      const outLabel = document.createElement('label');
-      outLabel.className = 'out-check';
-      const outInput = document.createElement('input');
-      outInput.type = 'checkbox';
-      outInput.checked = !hiddenOutputIds.has(c.id);
-      outInput.addEventListener('change', () => {
-        if (outInput.checked) hiddenOutputIds.delete(c.id);
-        else hiddenOutputIds.add(c.id);
-        renderCharList(); // 숨김/표시에 따라 접이식 섹션으로 이동
-        renderPreview();
-      });
-      outLabel.appendChild(outInput);
-      outLabel.appendChild(document.createTextNode(' 출력에 표시'));
+      // ① 이름 — 로그 속 닉네임과 화면에 표시할 이름
+      fields.appendChild(fieldRow('닉네임', nickInput));
+      fields.appendChild(fieldRow('표시 이름', dispInput));
+      fields.appendChild(fieldSep());
 
-      // 배경/글씨: 색 선택기 + 색상코드(#RRGGBB) 입력칸을 각 줄에
-      const bgLine = document.createElement('div');
-      bgLine.className = 'color-line';
-      bgLine.appendChild(bgLabel);
-      bgLine.appendChild(linkHexInput(bgInput));
-      fields.appendChild(bgLine);
+      // ② 모습 — 색·아바타, 그리고 결과가 바로 보이는 미리보기 칩
+      fields.appendChild(fieldRow('배경색', bgInput, linkHexInput(bgInput)));
+      fields.appendChild(fieldRow('글씨색', colorInput, linkHexInput(colorInput)));
+      fields.appendChild(fieldRow('아바타', emojiInput, uploadLabel, clearPhotoBtn));
+      fields.appendChild(fieldRow('미리보기', sample));
+      fields.appendChild(fieldSep());
 
-      const colorLine = document.createElement('div');
-      colorLine.className = 'color-line';
-      colorLine.appendChild(colorLabel);
-      colorLine.appendChild(linkHexInput(colorInput));
-      fields.appendChild(colorLine);
-
-      // 내 캐릭터 / 출력에 표시
-      const toggleLine = document.createElement('div');
-      toggleLine.className = 'toggle-line';
-      toggleLine.appendChild(meLabel);
-      toggleLine.appendChild(outLabel);
-      fields.appendChild(toggleLine);
-
-      if (hiddenOutputIds.has(c.id)) row.classList.add('char-hidden');
-
-      row.appendChild(fields);
+      // 내 캐릭터 / 삭제
+      const foot = document.createElement('div');
+      foot.className = 'char-foot';
+      foot.appendChild(meLabel);
 
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
-      removeBtn.className = 'remove-btn';
-      removeBtn.title = '삭제';
-      removeBtn.textContent = '✕';
+      removeBtn.className = 'char-remove';
+      removeBtn.textContent = '삭제';
       removeBtn.addEventListener('click', () => {
         const label = c.displayName || c.nickname || '이 캐릭터';
         if (confirm('‘' + label + '’ 캐릭터 설정을 삭제할까요? 되돌릴 수 없습니다.')) {
           removeCharacter(c.id);
         }
       });
-      row.appendChild(removeBtn);
+      foot.appendChild(removeBtn);
+      fields.appendChild(foot);
+
+      if (hiddenOutputIds.has(c.id)) row.classList.add('char-hidden');
+
+      bodyInner.appendChild(fields);
+      body.appendChild(bodyInner);
+      row.appendChild(body);
 
       return row;
   }
@@ -922,7 +1012,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     entries.forEach(entry => {
       const key = getFilterKey(entry);
       if (!seen.includes(key)) seen.push(key);
-      if (!(key in channelFilterState)) channelFilterState[key] = false;
+      // 처음 보는 채널은 기본 켜짐 — 붙여넣자마자 결과가 보여야 해요.
+      // 단 태그 없는 잡다한 시스템 줄이 모이는 '시스템/기타'만 기본 꺼짐.
+      if (!(key in channelFilterState)) channelFilterState[key] = (key !== '시스템/기타');
     });
 
     // 가나다순 정렬. 단 '시스템/기타'는 맨 아래로.
@@ -983,9 +1075,13 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     });
   }
 
+  // 마지막으로 파싱한 전체 항목 — 빈 미리보기 원인 진단과 '발견된 닉네임' 칩에 써요.
+  let lastParsedEntries = [];
+
   function getFilteredEntries(text) {
     const onlyRegistered = document.getElementById('filterToggle').checked;
     const entries = parseLog(text);
+    lastParsedEntries = entries;
     renderChannelFilter(entries);
     return entries.filter(entry => {
       if (channelFilterState[getFilterKey(entry)] === false) return false;
@@ -1094,7 +1190,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const bubble = document.createElement('div');
     bubble.className = 'log-bubble';
     bubble.style.background = char ? darkenHex(char.bg, 0.22) : '#1c232e';
-    bubble.style.color = char ? char.color : 'var(--text-primary)';
+    bubble.style.color = char ? char.color : '#e9e4d6';
 
     const meta = document.createElement('div');
     meta.className = 'log-meta';
@@ -1192,9 +1288,68 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     lineNode.appendChild(btn);
   }
 
+  // 로그에서 발견됐지만 아직 등록되지 않은 닉네임을 칩으로 보여줘요. 클릭 한 번으로 등록.
+  const FOUND_NICKS_MAX = 15;
+  function renderFoundNicks(entries) {
+    const box = document.getElementById('foundNicks');
+    const chips = document.getElementById('foundNicksChips');
+    if (!box || !chips) return;
+    const seen = new Set();
+    const unregistered = [];
+    (entries || []).forEach(e => {
+      const nick = normalizeNick(e.nickname);
+      if (!nick || seen.has(nick)) return;
+      seen.add(nick);
+      if (!findCharacterByNickname(nick)) unregistered.push(nick);
+    });
+    chips.innerHTML = '';
+    if (unregistered.length === 0) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    unregistered.slice(0, FOUND_NICKS_MAX).forEach(nick => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'found-nick-chip';
+      chip.title = '‘' + nick + '’ 캐릭터로 등록하기';
+      const plus = document.createElement('span');
+      plus.className = 'chip-plus';
+      plus.textContent = '+';
+      const name = document.createElement('span');
+      name.className = 'chip-nick';
+      name.textContent = nick;
+      chip.appendChild(plus);
+      chip.appendChild(name);
+      chip.addEventListener('click', () => addCharacter(nick));
+      chips.appendChild(chip);
+    });
+    if (unregistered.length > FOUND_NICKS_MAX) {
+      const more = document.createElement('span');
+      more.className = 'found-nicks-more';
+      more.textContent = '외 ' + (unregistered.length - FOUND_NICKS_MAX) + '명';
+      chips.appendChild(more);
+    }
+  }
+
+  // 미리보기가 비었을 때, 왜 비었는지 원인별로 알려줘요.
+  function emptyNoticeText(text) {
+    if (!text.trim()) return '로그를 붙여넣으면 자동으로 변환됩니다.';
+    const entries = lastParsedEntries || [];
+    if (entries.length === 0) return '인식할 수 있는 로그 줄이 없습니다. 게임에서 복사한 채팅 로그인지 확인해주세요.';
+    const afterChannel = entries.filter(e => channelFilterState[getFilterKey(e)] !== false);
+    if (afterChannel.length === 0) return '모든 줄이 채널 필터에 걸러졌습니다. 위 표시 옵션에서 채널을 체크해주세요.';
+    const onlyRegistered = document.getElementById('filterToggle').checked;
+    if (onlyRegistered && afterChannel.every(e => e.nickname && !charForEntry(e))) {
+      return '등록된 닉네임이 없어 모든 줄이 걸러졌습니다. 닉네임 설정의 ‘발견된 닉네임’에서 클릭 한 번으로 등록하거나, ‘등록된 닉네임만 표시’를 꺼보세요.';
+    }
+    return '남은 줄이 캐릭터의 ‘출력’ 체크 해제로 모두 숨겨져 있습니다. 캐릭터 행 오른쪽의 출력 체크를 확인해주세요.';
+  }
+
   function renderPreview() {
     const text = document.getElementById('logInput').value;
     const filtered = getFilteredEntries(text);
+    renderFoundNicks(lastParsedEntries);
 
     const preview = document.getElementById('preview');
     preview.innerHTML = '';
@@ -1243,8 +1398,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
       const bubble = document.createElement('div');
       bubble.className = 'log-bubble';
-      bubble.style.background = char ? char.bg : 'var(--panel-raised)';
-      bubble.style.color = char ? char.color : 'var(--text-primary)';
+      bubble.style.background = char ? char.bg : '#242c39';
+      bubble.style.color = char ? char.color : '#e9e4d6';
 
       const meta = document.createElement('div');
       meta.className = 'log-meta';
@@ -1274,7 +1429,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     });
 
     if (filtered.length === 0) {
-      preview.innerHTML = '<p class="empty-notice">표시할 로그가 없습니다. 로그를 붙여넣고, 닉네임을 등록했는지 확인해주세요.</p>';
+      const p = document.createElement('p');
+      p.className = 'empty-notice';
+      p.textContent = emptyNoticeText(text);
+      preview.appendChild(p);
     }
   }
 
@@ -1282,16 +1440,26 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   // cropToView=false: 박스 크기와 상관없이 로그 전체를 캡처
   // cropToView=true: 미리보기 박스에 '보이는 만큼만' 캡처
-  function capturePreview(cropToView) {
+  function capturePreview(cropToView, btnId) {
     const node = document.getElementById('preview');
     if (!node.children.length || node.querySelector('.empty-notice')) {
       alert('내보낼 로그가 없습니다. 로그를 붙여넣어 주세요.');
       return;
     }
+    // 긴 로그는 캡처에 몇 초 걸려요 — 저장 중임을 버튼으로 알리고 중복 클릭을 막아요.
+    const busyBtn = btnId ? document.getElementById(btnId) : null;
+    if (busyBtn && busyBtn.disabled) return;
+    const busyText = busyBtn ? busyBtn.textContent : '';
+    const setBusy = (on) => {
+      if (!busyBtn) return;
+      busyBtn.disabled = on;
+      busyBtn.textContent = on ? '저장 중…' : busyText;
+    };
     if (typeof html2canvas === 'undefined') {
       alert('이미지 저장 기능을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.');
       return;
     }
+    setBusy(true);
 
     const scale = 2;
     // 보이는 영역 정보(펼치기 전에 기록)
@@ -1328,8 +1496,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       link.download = 'ffxiv_log_' + Date.now() + '.png';
       link.href = out.toDataURL('image/png');
       link.click();
+      setBusy(false);
     }).catch(err => {
       restore();
+      setBusy(false);
       alert('이미지 저장 중 문제가 발생했습니다: ' + err.message);
     });
   }
@@ -1359,7 +1529,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   // 오른쪽 끝 시간 칸 (시간 표시 켜진 경우에만). 대사 칸과 같이 세로 가운데로 맞춰요.
   function copyTimeCell(timeHtml) {
-    return '<td width="46" valign="middle" style="width:46px;border:none;padding:7px 4px 7px 4px;text-align:right;color:#999;font-size:11px;white-space:nowrap;">' + (timeHtml || '') + '</td>';
+    return '<td width="46" valign="middle" style="width:46px;border:none;padding:7px 4px 7px 4px;text-align:right;color:#999;font-size:11px;font-family:\'DM Mono\',Consolas,monospace;white-space:nowrap;">' + (timeHtml || '') + '</td>';
   }
 
   // [색 줄][아바타][이름·메시지]( [시간] ) 행. 색 줄은 캐릭터 배경색이라 사진을 넣어도 캐릭터 색이 남아요.
@@ -1384,7 +1554,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return '<tr>' +
         '<td colspan="2" style="border:none;padding:0;"></td>' +
         '<td style="border:none;padding:4px 0;text-align:center;' + COPY_FONT + (extraStyle || '') + '">' + innerHtml + '</td>' +
-        '<td width="46" valign="top" style="width:46px;border:none;padding:4px 4px 0 4px;text-align:right;font-size:11px;color:' + (timeColor || '#999') + ';white-space:nowrap;">' + (timeHtml || '') + '</td>' +
+        '<td width="46" valign="top" style="width:46px;border:none;padding:4px 4px 0 4px;text-align:right;font-size:11px;font-family:\'DM Mono\',Consolas,monospace;color:' + (timeColor || '#999') + ';white-space:nowrap;">' + (timeHtml || '') + '</td>' +
       '</tr>';
     }
     return '<tr>' +
@@ -1444,6 +1614,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
      티스토리·블로그 HTML 모드나 웹페이지는 진짜 브라우저로 렌더링하므로, 미리보기 모습
      (둥근 말풍선·아바타 원·귓속말 반투명·감정표현 알약)을 그대로 인라인 스타일로 재현해요. */
 
+  // 오른쪽 끝에 붙는 시간 — 미리보기(.log-time)처럼 모노스페이스로.
+  function richTimeHtml(time) {
+    if (!time) return '';
+    return '<span style="margin-left:auto;font-size:10.5px;opacity:0.6;font-family:\'DM Mono\',monospace;white-space:nowrap;">' + escapeHtml(time) + '</span>';
+  }
+
   function richAvatarHtml(char, fallback, size, opacity) {
     const op = (opacity != null && opacity < 1) ? 'opacity:' + opacity + ';' : '';
     const base = 'width:' + size + 'px;height:' + size + 'px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;overflow:hidden;';
@@ -1453,16 +1629,35 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const inner = (char.avatarType === 'image' && char.avatarValue)
       ? '<img src="' + char.avatarValue + '" style="width:100%;height:100%;object-fit:cover;display:block;">'
       : escapeHtml(char.avatarValue || '');
-    return '<div style="' + base + 'background:' + char.bg + ';color:' + char.color + ';font-size:16px;' + op + '">' + inner + '</div>';
+    return '<div style="' + base + 'background:' + char.bg + ';color:' + char.color + ';font-size:16px;box-shadow:0 0 0 1px rgba(255,255,255,0.09), 0 1px 4px rgba(0,0,0,0.3);' + op + '">' + inner + '</div>';
   }
 
-  function richRowHtml(av, bg, color, header, body, dashed) {
-    const border = dashed ? 'border:1px solid rgba(255,255,255,0.14);' : '';
+  function richRowHtml(av, bg, color, header, body, dashed, time) {
+    // 귓속말은 반투명 테두리(그림자 없음), 일반 대화는 미세 하이라이트 테두리 + 낮은 그림자 — 미리보기와 동일.
+    const border = dashed
+      ? 'border:1px solid rgba(255,255,255,0.14);'
+      : 'border:1px solid rgba(255,255,255,0.06);box-shadow:0 2px 10px rgba(0,0,0,0.26);';
+    const msgStyle = 'font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap;';
+    // 미리보기(fillBubble)와 같은 규칙:
+    // - 메타(이름·채널)가 있으면: 메타 줄(+시간 오른쪽 끝) 위, 메시지 아래
+    // - 메타가 없고 시간만 있으면: 메시지·시간을 한 줄에 (말풍선이 세로로 얇아져요)
+    // - 아무것도 없으면: 메시지만
+    let content;
+    if (header) {
+      content = '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' + header + richTimeHtml(time) + '</div>' +
+        '<div style="' + msgStyle + '">' + body + '</div>';
+    } else if (time) {
+      content = '<div style="display:flex;align-items:center;gap:8px;">' +
+        '<div style="flex:1 1 auto;min-width:0;' + msgStyle + '">' + body + '</div>' +
+        '<span style="flex:0 0 auto;font-size:10.5px;opacity:0.6;font-family:\'DM Mono\',monospace;white-space:nowrap;">' + escapeHtml(time) + '</span>' +
+      '</div>';
+    } else {
+      content = '<div style="' + msgStyle + '">' + body + '</div>';
+    }
     return '<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:12px;">' +
       av +
-      '<div style="flex:1;border-radius:10px;padding:9px 12px;background:' + bg + ';color:' + color + ';' + border + '">' +
-        '<div style="margin-bottom:3px;">' + header + '</div>' +
-        '<div style="font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap;">' + body + '</div>' +
+      '<div style="flex:1;min-width:0;border-radius:12px;padding:10px 14px;background:' + bg + ';color:' + color + ';' + border + '">' +
+        content +
       '</div></div>';
   }
 
@@ -1474,25 +1669,38 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const time = (entry.time && shouldShowTime()) ? entry.time : '';
     const msgHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
 
-    // 시스템 알림 (시간은 뒤=오른쪽, 색은 설정값). 등록 닉네임은 표시 이름으로.
+    // 시스템 알림 — 가운데 본문 좌우로 옅어지는 장식 헤어라인(미리보기와 동일).
+    // 오른쪽 선은 항상 깔리고, 시간이 있으면 그 선 끝에 붙어 좌우가 대칭이에요.
     if (isSystem) {
-      const t = time ? ' <span style="font-size:11px;opacity:0.7;margin-left:6px;">' + escapeHtml(time) + '</span>' : '';
+      const hairL = '<span style="flex:1 1 0;align-self:center;height:1px;background:linear-gradient(90deg,transparent,currentColor);opacity:0.25;"></span>';
+      const hairR = '<span style="flex:1 1 0;height:1px;background:linear-gradient(90deg,currentColor,transparent);opacity:0.25;"></span>';
+      const timeSpan = time
+        ? '<span style="font-size:10.5px;opacity:0.7;font-family:\'DM Mono\',monospace;white-space:nowrap;">' + escapeHtml(time) + '</span>'
+        : '';
+      const right = '<span style="flex:1 1 0;align-self:center;display:flex;align-items:center;justify-content:flex-end;gap:7px;">' + hairR + timeSpan + '</span>';
       const tag = (entry.channel && entry.channelType === 'system')
-        ? '<span style="font-size:10.5px;color:#a8843f;border:1px solid #2c3648;border-radius:4px;padding:0 5px;margin-right:6px;">' + escapeHtml(entry.channel) + '</span>' : '';
+        ? '<span style="font-size:10.5px;color:#a8843f;border:1px solid rgba(168,132,63,0.45);border-radius:999px;padding:0 7px;margin-right:6px;letter-spacing:0.3px;white-space:nowrap;">' + escapeHtml(entry.channel) + '</span>' : '';
       const sysHtml = escapeHtml(formatSystemText(entry.message)).replace(/\n/g, '<br>');
-      return '<div style="text-align:center;color:' + settings.sysColor + ';font-size:12px;margin-bottom:10px;">' + tag + sysHtml + t + '</div>';
+      return '<div style="display:flex;align-items:baseline;gap:7px;color:' + settings.sysColor + ';font-size:12px;line-height:1.55;margin-bottom:10px;">' +
+        hairL +
+        '<span style="text-align:center;min-width:0;word-break:break-word;">' + tag + sysHtml + '</span>' +
+        right + '</div>';
     }
 
-    // 감정표현 (나래이션이라 아바타 없이 본문만)
+    // 감정표현 (나래이션이라 아바타 없이 본문만) — 세리프 이탤릭 알약 가운데,
+    // 시간은 미리보기처럼 알약 밖 오른쪽 열에.
     if (isEmote) {
       const bg = char ? char.bg : '#242c39';
       const color = char ? char.color : '#e9e4d6';
-      const t = time ? '<span style="font-style:normal;font-size:11px;opacity:0.65;margin-left:8px;">' + escapeHtml(time) + '</span>' : '';
+      const t = time ? '<span style="font-size:10.5px;opacity:0.65;font-family:\'DM Mono\',monospace;white-space:nowrap;">' + escapeHtml(time) + '</span>' : '';
       const emoteHtml = escapeHtml(applyDisplayNames(entry.message)).replace(/\n/g, '<br>');
-      return '<div style="text-align:center;margin-bottom:12px;">' +
-        '<span style="display:inline-block;background:' + bg + ';color:' + color + ';border-radius:999px;padding:9px 16px;font-style:italic;font-size:14px;">' +
-          emoteHtml + t +
-        '</span></div>';
+      return '<div style="display:flex;align-items:center;gap:7px;margin-bottom:12px;padding:0 12px;">' +
+        '<span style="flex:1 1 0;"></span>' +
+        '<span style="display:inline-block;min-width:0;max-width:100%;background:' + bg + ';color:' + color + ';border-radius:22px;padding:9px 17px;font-family:\'Gowun Batang\',serif;font-style:italic;font-size:14px;line-height:1.5;border:1px solid rgba(255,255,255,0.08);box-shadow:0 2px 12px rgba(0,0,0,0.25);word-break:break-word;white-space:pre-wrap;">' +
+          emoteHtml +
+        '</span>' +
+        '<span style="flex:1 1 0;display:flex;align-items:center;justify-content:flex-end;">' + t + '</span>' +
+      '</div>';
     }
 
     // 귓속말
@@ -1505,12 +1713,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const metaParts = [];
       if (shouldShowName()) metaParts.push('→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()));
       if (shouldShowChannel()) metaParts.push('귓속말'); // '귓속말'은 채널 표시에 따라요.
-      if (time) metaParts.push(time);
       const meta = metaParts.join(' ');
-      const av = richAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?'), 36, 0.72);
+      const av = richAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?'), 36, 1);
       const header = (shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b> ' : '') +
         (meta ? '<span style="font-size:11px;opacity:0.7;">' + escapeHtml(meta) + '</span>' : '');
-      return richRowHtml(av, bg, color, header, '<span style="font-style:italic;">' + msgHtml + '</span>', true);
+      return richRowHtml(av, bg, color, header.trim(), '<span style="font-style:italic;">' + msgHtml + '</span>', true, time);
     }
 
     // 일반 대화
@@ -1518,11 +1725,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const color = char ? char.color : '#e9e4d6';
     const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
     const ch = (entry.channel && shouldShowChannel()) ? ' <span style="font-size:11px;opacity:0.75;">[' + escapeHtml(entry.channel) + ']</span>' : '';
-    const t = time ? ' <span style="font-size:11px;opacity:0.6;">' + escapeHtml(time) + '</span>' : '';
     const av = richAvatarHtml(char, (entry.nickname || '?').charAt(0) || '?', 36, 1);
     const nameHtml = shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' : '';
-    const header = (nameHtml + ch + t).trim();
-    return richRowHtml(av, bg, color, header, msgHtml, false);
+    const header = (nameHtml + ch).trim();
+    return richRowHtml(av, bg, color, header, msgHtml, false, time);
   }
 
   function buildRichHtmlDocument(filtered) {
@@ -1571,7 +1777,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const text = document.getElementById('logInput').value;
     const filtered = getFilteredEntries(text);
     if (filtered.length === 0) {
-      alert('복사할 로그가 없습니다. 먼저 변환하기를 눌러주세요.');
+      alert('복사할 로그가 없습니다. 먼저 로그를 붙여넣어 주세요.');
       return;
     }
 
@@ -1635,7 +1841,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const text = document.getElementById('logInput').value;
     const filtered = getFilteredEntries(text);
     if (filtered.length === 0) {
-      alert('복사할 로그가 없습니다. 먼저 변환하기를 눌러주세요.');
+      alert('복사할 로그가 없습니다. 먼저 로그를 붙여넣어 주세요.');
       return;
     }
 
@@ -1679,7 +1885,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const text = document.getElementById('logInput').value;
     const filtered = getFilteredEntries(text);
     if (filtered.length === 0) {
-      alert('복사할 로그가 없습니다. 먼저 변환하기를 눌러주세요.');
+      alert('복사할 로그가 없습니다. 먼저 로그를 붙여넣어 주세요.');
       return;
     }
 
@@ -1720,7 +1926,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   /* ---------- 이벤트 연결 ---------- */
 
-  document.getElementById('addCharBtn').addEventListener('click', addCharacter);
+  document.getElementById('addCharBtn').addEventListener('click', () => addCharacter());
   document.getElementById('filterToggle').addEventListener('change', renderPreview);
   document.getElementById('showChannelToggle').addEventListener('change', renderPreview);
   document.getElementById('showTimeToggle').addEventListener('change', renderPreview);
@@ -1728,8 +1934,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   document.getElementById('copyBtn').addEventListener('click', copyFormatted);
   document.getElementById('htmlCopyBtn').addEventListener('click', copyHtmlCode);
   document.getElementById('textCopyBtn').addEventListener('click', copyPlainText);
-  document.getElementById('exportFullBtn').addEventListener('click', () => capturePreview(false));
-  document.getElementById('exportViewBtn').addEventListener('click', () => capturePreview(true));
+  document.getElementById('exportFullBtn').addEventListener('click', () => capturePreview(false, 'exportFullBtn'));
+  document.getElementById('exportViewBtn').addEventListener('click', () => capturePreview(true, 'exportViewBtn'));
   document.getElementById('resetPreviewSize').addEventListener('click', () => {
     const p = document.getElementById('preview');
     p.style.width = '';
