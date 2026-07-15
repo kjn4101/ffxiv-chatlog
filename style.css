@@ -152,11 +152,11 @@
 
   aside.panel {
     border-right: 1px solid var(--border-soft);
-    padding: var(--space-lg) var(--space-lg) var(--space-2xl);
+    padding: var(--space-xl) var(--space-lg) var(--space-2xl);
   }
 
   section.panel {
-    padding: var(--space-lg) 28px var(--space-2xl);
+    padding: var(--space-xl) 28px var(--space-2xl);
   }
 
   @media (max-width: 900px) {
@@ -757,10 +757,11 @@
 
   textarea#logInput::placeholder { color: var(--text-secondary); font-family: var(--font-sans); }
 
-  /* ---------- 표시 옵션 바 — 미리보기를 조절하는 모든 것을 한 줄에 ---------- */
+  /* ---------- 표시 옵션 바 — 미리보기를 조절하는 모든 것을 한 곳에 ----------
+     표시 옵션 | 색상이 정확히 절반씩 나뉘고, 채널 필터는 아래 풀폭 행. */
   .options-bar {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-md) var(--space-lg);
     margin-top: var(--space-md);
     padding: var(--space-md) 18px;
@@ -795,7 +796,7 @@
 
   /* 채널 필터는 항상 전용 풀폭 행 — 칩이 가로로 흐를 공간을 확보 */
   .option-group-channels {
-    flex: 1 1 100%;
+    grid-column: 1 / -1;
     padding-left: 0;
     border-left: none;
     padding-top: var(--space-sm);
@@ -803,13 +804,13 @@
   }
 
   @media (max-width: 700px) {
+    .options-bar { grid-template-columns: 1fr; }
     .option-group + .option-group {
       padding-left: 0;
       border-left: none;
       padding-top: var(--space-sm);
       border-top: 1px solid var(--border-soft);
     }
-    .option-group { flex: 1 1 100%; }
   }
 
   .option-group-title {

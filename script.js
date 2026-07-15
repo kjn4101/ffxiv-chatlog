@@ -1029,7 +1029,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     if (seen.length === 0) {
       const hint = document.createElement('p');
       hint.className = 'char-empty-hint';
-      hint.textContent = '로그를 변환하면 채널 목록이 여기에 나타납니다.';
+      hint.textContent = '로그를 붙여넣으면 채널 목록이 여기에 나타납니다.';
       container.appendChild(hint);
       return;
     }
