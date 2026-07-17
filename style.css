@@ -1,6 +1,5 @@
 :root {
-    /* 에오르제아의 밤하늘 — 깊은 남보라에 황금빛 장식과 크리스탈(에테르) 청록을 더했어요.
-       금은 정체성·장식, 청록은 상호작용. 강조색은 이 둘뿐입니다 (The Two-Light Rule). */
+    /* 팔레트: 남보라 다크 + 골드(정체성)/청록(상호작용) 2색 강조 */
     --void: #0b0e16;
     --panel: #161c28;
     --panel-raised: #1f2735;
@@ -27,8 +26,7 @@
     --space-xl: 32px;
     --space-2xl: 48px;
 
-    /* 타입 스케일 — rem 기반(루트 16px).
-       미리보기(.log-*)는 내보내기 HTML과 픽셀이 맞아야 해서 별도로 px를 유지합니다. */
+    /* 타입 스케일(rem). 미리보기 .log-*는 내보내기와 픽셀 일치를 위해 px 유지 */
     --text-2xs: 0.6875rem;  /* 11px — 캡션·미세 라벨 */
     --text-xs:  0.75rem;    /* 12px — 보조 UI·메타 */
     --text-sm:  0.8125rem;  /* 13px — UI 본문(밀집) */
@@ -368,12 +366,42 @@
 
   .char-row:hover { border-color: var(--border-glow); }
 
-  /* 머리줄 — 접힌 상태에서 보이는 전부. 아바타 칩이 색·이모지를 그대로 보여줘요. */
+  /* 머리줄 — 접힌 상태에서 보이는 전부 */
   .char-head {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 7px 10px;
+    padding: 7px 10px 7px 6px;
+  }
+
+  /* 드래그 핸들 — 끌어서(또는 포커스 후 ↑↓로) 순서 바꾸기 */
+  .char-drag-handle {
+    flex-shrink: 0;
+    background: none;
+    border: none;
+    padding: 4px 2px;
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1;
+    color: var(--text-secondary);
+    opacity: 0.55;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    transition: color 0.16s var(--ease), opacity 0.16s var(--ease);
+  }
+
+  .char-drag-handle:hover,
+  .char-drag-handle:focus-visible { color: var(--cyan); opacity: 1; }
+
+  .char-drag-handle:active { cursor: grabbing; }
+
+  /* 드래그 중인 행 */
+  .char-row.dragging {
+    border-color: var(--cyan);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+    position: relative;
+    z-index: 3;
   }
 
   .char-summary {
@@ -434,7 +462,7 @@
   /* 편집 중인 행은 금빛 테두리로 살짝 표시 */
   .char-row.open { border-color: var(--border-glow); }
 
-  /* 본문 접기/펼치기 — grid 0fr→1fr 트릭으로 높이를 부드럽게 여닫아요. */
+  /* 본문 접기/펼치기 — grid 0fr→1fr 트릭 */
   .char-body {
     display: grid;
     grid-template-rows: 0fr;
@@ -518,7 +546,7 @@
     border-top: 1px dashed var(--border-soft);
   }
 
-  /* 필드 그리드 — 모든 줄이 [라벨 | 컨트롤]로 세로 정렬돼요. */
+  /* 필드 그리드 — [라벨 | 컨트롤] 정렬 */
   .field-row {
     display: flex;
     align-items: center;
@@ -550,7 +578,7 @@
     flex-shrink: 0;
   }
 
-  /* 색·이름을 만지면 결과가 바로 보이는 미니 대사 칩 */
+  /* 실시간 미니 대사 미리보기 칩 */
   .char-sample {
     display: inline-flex;
     align-items: baseline;
@@ -1049,8 +1077,7 @@
   .export-note b { color: var(--text-primary); font-weight: 500; }
 
   /* ---------- 로그 콘텐츠 (미리보기 = 내보내기 결과물) ----------
-     여기부터는 UI 크롬이 아니라 사용자가 내보내는 결과물의 모습입니다.
-     사용자 지정 색 위에 얹히므로 px 크기와 형태 규칙을 유지해요. */
+     내보내기 인라인 스타일과 px 단위로 일치해야 함 */
   .log-line {
     display: flex;
     gap: 11px;
@@ -1068,7 +1095,7 @@
     font-size: 16px;
     overflow: hidden;
     background: var(--panel-raised);
-    /* 얇은 하이라이트 링 — 어떤 배경색 위에서도 원이 또렷하게 서요. */
+    /* 하이라이트 링 — 배경색과 무관하게 원 유지 */
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 1px 4px rgba(0, 0, 0, 0.3);
   }
 
@@ -1087,7 +1114,7 @@
     border-radius: 12px;
     padding: 10px 14px;
     background: var(--panel-raised);
-    /* 위쪽 모서리에 얹히는 미세 하이라이트 테두리 + 낮고 부드러운 그림자 */
+    /* 미세 하이라이트 테두리 + 낮은 그림자 */
     border: 1px solid rgba(255, 255, 255, 0.06);
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.26);
   }
@@ -1124,11 +1151,10 @@
     font-size: 14px;
     line-height: 1.6;
     word-break: break-word;
-    white-space: pre-wrap; /* 정렬용 연속 공백을 그대로 살려요. */
+    white-space: pre-wrap; /* 정렬용 연속 공백 보존 */
   }
 
-  /* 이름·채널이 없을 때: 메시지와 시간을 한 줄에 둬 말풍선이 세로로 얇게 보이게.
-     시간을 메시지와 세로 가운데로 맞추려고 baseline이 아닌 center로 정렬해요. */
+  /* 이름·채널이 없을 때: 메시지·시간을 한 줄에 (center 정렬) */
   .log-inline-row {
     display: flex;
     align-items: center;
@@ -1148,9 +1174,7 @@
     gap: 7px;
   }
 
-  /* 나래이션은 세리프 이탤릭 — 기록보의 지문(地文)처럼 읽혀요.
-     라운드는 완전 알약(999px)이 아닌 22px 캡슐 — 한 줄일 땐 알약처럼 보이고,
-     여러 줄로 길어져도 양 끝이 럭비공처럼 부풀지 않아요. */
+  /* 나래이션: 세리프 이탤릭 캡슐 (22px — 여러 줄에서도 모양 유지) */
   .log-emote {
     display: inline-flex;
     align-items: center;
@@ -1177,7 +1201,7 @@
     color: var(--text-secondary);
   }
 
-  /* 감정표현 시간 칸을 알약 높이만큼 늘려, 그 안에서 시간을 세로 가운데로 정확히 맞춰요. */
+  /* 감표 시간 칸을 알약 높이에 맞춰 세로 중앙 정렬 */
   .log-emote-line .log-system-timewrap {
     align-self: stretch;
     display: flex;
@@ -1185,7 +1209,7 @@
     justify-content: flex-end;
   }
 
-  /* 귓속말 — 사적으로 소근거리는 느낌. 캐릭터 색을 살짝 어둡게(그림자처럼)해 구분, 메시지는 이탤릭. */
+  /* 귓속말 — 반투명 테두리 + 이탤릭 */
   .log-line.is-whisper .log-bubble {
     border: 1px solid rgba(255, 255, 255, 0.14);
     box-shadow: none;
@@ -1215,9 +1239,7 @@
 
   .log-system-spacer { flex: 1 1 0; }
 
-  /* 시스템 알림 좌우로 옅어지는 장식 헤어라인 — 기록 속의 구분선처럼.
-     왼쪽은 스페이서가 선이 되고, 오른쪽은 timewrap 안의 ::before가 선이 돼요.
-     시간이 있으면 오른쪽 선 끝에 시간이 붙어 좌우가 항상 대칭입니다. */
+  /* 시스템 알림 좌우 장식 헤어라인 — 왼쪽은 spacer, 오른쪽은 timewrap::before. 시간은 선 끝에 */
   .log-system > .log-system-spacer {
     align-self: center;
     height: 1px;
@@ -1275,7 +1297,7 @@
     white-space: pre-wrap;
   }
 
-  /* 감표 ⇄ 시스템 수동 전환 버튼 — 줄에 마우스를 올렸을 때만 살짝 나타나요(미리보기 전용). */
+  /* 감표 ⇄ 시스템 전환 버튼 — hover 시 표시 (미리보기 전용) */
   .log-line.has-swap { position: relative; }
 
   .log-swap-btn {

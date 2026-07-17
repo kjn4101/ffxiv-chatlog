@@ -15,7 +15,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       localStorage.setItem(STORAGE_KEY, JSON.stringify(characters));
       storageWarned = false;
     } catch (e) {
-      // 저장 공간 초과 등으로 실패하면 한 번만 알려줘요.
+      // 저장 실패(용량 초과 등) 시 한 번만 알림
       if (!storageWarned) {
         storageWarned = true;
         alert('저장 공간이 부족해 캐릭터 설정을 저장하지 못했습니다.\n이미지 아바타 수를 줄이거나 일부 캐릭터를 삭제해주세요.');
@@ -42,7 +42,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   let settings = loadSettings();
   if (!settings.bgColor) settings.bgColor = DEFAULT_BG;
   if (!settings.sysColor) settings.sysColor = DEFAULT_SYS_COLOR;
-  // 잠시 쓰였던 웜톤 기본값이 저장돼 있으면 남색 기본값으로 되돌려요. 직접 고른 다른 색은 그대로 둡니다.
+  // 구버전 웜톤 기본값 마이그레이션 (직접 고른 색은 유지)
   if (settings.bgColor === '#211d19') settings.bgColor = DEFAULT_BG;
   if (settings.sysColor === '#a59d92') settings.sysColor = DEFAULT_SYS_COLOR;
 
@@ -59,19 +59,19 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     if (preview) preview.style.background = settings.bgColor;
   }
 
-  // 예전 버전의 기본 아바타(🙂 또는 ＃)가 남아있으면 '비어있음(색만 표시)'으로 정리해요.
+  // 구버전 기본 아바타(🙂/＃) 정리
   let migrated = false;
   characters.forEach(c => {
     if (c.avatarType === 'emoji' && (c.avatarValue === '🙂' || c.avatarValue === '＃')) {
       c.avatarValue = '';
       migrated = true;
     }
-    // 이모지 텍스트를 이미지와 별도로 기억해요. 그래야 사진이 있어도 이모지가 안 날아가요.
+    // 이모지 텍스트는 사진과 별도로 보관
     if (c.emojiText === undefined) {
       c.emojiText = (c.avatarType === 'emoji') ? (c.avatarValue || '') : '';
       migrated = true;
     }
-    // 잠시 쓰였던 웜톤 말풍선 기본색이 그대로면 남색 기본색으로 되돌려요.
+    // 구버전 웜톤 말풍선 기본색 마이그레이션
     if (c.bg === '#38322b') {
       c.bg = '#26303f';
       migrated = true;
@@ -83,12 +83,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
   }
 
-  // 파판14 한국 서버명. 닉네임 뒤에 서버명이 붙어 나오는 경우(예: 찹쌀망개떡펜리르)가 있어요.
+  // 한국 서버명 — 닉네임 뒤에 붙어 나오는 경우 제거용
   const SERVER_NAMES = ['초코보', '모그리', '펜리르', '카벙클', '톤베리'];
 
   function stripServerSuffix(name) {
     const n = (name || '').trim();
-    // 맨 끝 세 글자가 서버명과 같을 때만 떼어내요. 앞이나 가운데에 있으면 닉네임의 일부로 봐요.
+    // 맨 끝이 서버명일 때만 제거 (앞·가운데는 닉네임 일부)
     if (n.length > 3 && SERVER_NAMES.includes(n.slice(-3))) {
       return n.slice(0, -3).trim();
     }
@@ -99,8 +99,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return stripServerSuffix((name || '').split('@')[0].trim());
   }
 
-  // 저장된 아바타(dataURL)를 작은 '원형' 썸네일(PNG)로 만들어요. 서식 복사 시 에디터가 둥근 모서리를
-  // 못 살려도 이미 원형으로 그려져 있어 동그랗게 보이고, 크기 지정을 무시해도 이 크기로 또렷해요.
+  // 아바타 dataURL → 원형 PNG 썸네일 (서식 복사용 — 에디터가 둥근 모서리를 못 살려도 원형 유지)
   function downscaleDataUrl(dataUrl, size) {
     return new Promise((resolve) => {
       const img = new Image();
@@ -118,12 +117,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         ctx.restore();
         resolve(canvas.toDataURL('image/png'));
       };
-      img.onerror = () => resolve(dataUrl); // 실패하면 원본을 그대로
+      img.onerror = () => resolve(dataUrl); // 실패 시 원본 유지
       img.src = dataUrl;
     });
   }
 
-  // 색·이모지 아바타를 '원형 이미지'로 그려요(빈 동그라미도 이미지라 에디터에서 안 사라져요).
+  // 색/이모지 아바타를 원형 이미지로 렌더링
   function copyCircleDataUrl(bg, color, text, size) {
     const canvas = document.createElement('canvas');
     canvas.width = size;
@@ -146,12 +145,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return canvas.toDataURL('image/png');
   }
 
-  // 서식 복사용 아바타 크기(px). 별도 사진 칸에 들어가므로 줄을 망가뜨리지 않고, 에디터가 width
-  // 지정을 무시해도 이 원본 크기로 또렷하게 보여요.
+  // 서식 복사용 아바타 크기(px)
   const AVATAR_THUMB_SIZE = 36;
-  const AVATAR_THUMB_VERSION = 6; // 썸네일 규격이 바뀌면 숫자를 올려 기존 썸네일을 다시 만들게 해요.
+  const AVATAR_THUMB_VERSION = 6; // 규격 변경 시 올려서 썸네일 재생성
 
-  // 썸네일이 없거나 규격이 옛날이면 다시 만들어 둬요 (다음 서식 복사부터 작게 나옴).
+  // 썸네일이 없거나 구규격이면 재생성
   function ensureAvatarThumbs() {
     const need = characters.filter(c => c.avatarType === 'image' && c.avatarValue &&
       (!c.avatarThumb || c.avatarThumbV !== AVATAR_THUMB_VERSION));
@@ -302,7 +300,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return characters.find(c => c.isMe);
   }
 
-  // 닉네임 하나를 화면용 이름으로 — 등록돼 있고 표시 이름이 있으면 그 이름, 없으면 닉네임 그대로.
+  // 닉네임 → 화면용 이름 (표시 이름 우선)
   function nickToDisplay(nick) {
     const c = findCharacterByNickname(nick);
     return (c && c.displayName) ? c.displayName : (normalizeNick(nick) || nick || '');
@@ -315,12 +313,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   }
 
   function charForEntry(entry) {
-    // 내가 보낸 귓속말은 받는 상대가 아니라 '내 캐릭터'를 기준으로 표시·필터링해요.
+    // 보낸 귓속말은 '내 캐릭터' 기준으로 표시·필터링
     if (entry.channelType === 'whisper-out') return getMyCharacter();
     return findCharacterByNickname(entry.nickname);
   }
 
-  // 색 선택기(<input type=color>) 옆에 붙는 색상코드(#RRGGBB) 입력칸을 만들어 서로 동기화해요.
+  // 색 선택기와 동기화되는 색상코드(#RRGGBB) 입력칸 생성
   function linkHexInput(colorInput) {
     const tx = document.createElement('input');
     tx.type = 'text';
@@ -343,7 +341,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return tx;
   }
 
-  // 색을 검정 쪽으로 ratio만큼 섞어 살짝 어둡게(그림자 씌운 느낌). 투명도와 달리 배경색에 영향받지 않아요.
+  // 색을 ratio만큼 어둡게 (투명도와 달리 배경색 영향 없음)
   function darkenHex(hex, ratio) {
     const h = (hex || '').replace('#', '');
     if (h.length !== 6) return hex || '#1c232e';
@@ -354,9 +352,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return '#' + [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
   }
 
-  // 감정표현 문장 안에 등장하는 등록된 닉네임을, 표시 이름이 지정돼 있으면 그 이름으로 바꿔요.
-  // (예: "A가 B를 껴안습니다" → 표시 이름이 있으면 그 이름으로) 긴 닉네임부터 치환해
-  // 짧은 닉네임이 긴 닉네임의 일부를 잘못 바꾸는 일을 막아요.
+  // 감표 문장 속 등록 닉네임 → 표시 이름 치환 (긴 닉네임부터 — 부분 오치환 방지)
   function applyDisplayNames(text) {
     let result = text;
     const subs = characters
@@ -369,9 +365,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return result;
   }
 
-  // 시스템 로그에서 닉네임 뒤에 붙은 서버명을 떼어내요. (예: "D'펜리르 님이" → "D' 님이",
-  // "C초코보 님을" → "C 님을") 서버명 앞에 한 글자 이상 있고 뒤에 '님'이 올 때만 떼어
-  // "펜리르 님이"처럼 서버명과 같은 닉네임은 보존해요.
+  // 시스템 로그의 닉네임 뒤 서버명 제거 (앞에 글자가 있고 뒤에 '님'이 올 때만)
   const SYSTEM_SERVER_RE = new RegExp('([^\\s])(' + SERVER_NAMES.join('|') + ')(?=\\s?님)', 'g');
   function stripSystemServerNames(text) {
     return (text || '').replace(SYSTEM_SERVER_RE, '$1');
@@ -394,7 +388,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   let charSearchQuery = '';
   let hiddenSectionOpen = false; // '숨긴 캐릭터' 접이식 섹션 펼침 여부
   let expandedCharId = null; // 펼쳐서 편집 중인 캐릭터 행 — 아코디언(한 번에 하나만)
-  // 미리보기에서 감표↔시스템으로 직접 바꾼 줄: 원문(raw) → 'emote' | 'system'. 새로고침하면 초기화돼요.
+  // 감표↔시스템 수동 전환 기록: raw → 'emote' | 'system' (새로고침 시 초기화)
   const swapOverrides = new Map();
 
   function computePresentCharIds(logText) {
@@ -406,8 +400,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return ids;
   }
 
-  // 편집 목록에 보여줄 캐릭터를 추려요.
-  // 검색 중이면 전체에서 검색(라이브러리 조회), 아니면 narrowing 규칙 적용.
+  // 편집 목록에 보여줄 캐릭터 선별 — 검색 중엔 전체에서, 아니면 narrowing 규칙
   function getEditorChars() {
     const q = charSearchQuery.trim().toLowerCase();
     if (q) {
@@ -425,7 +418,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   /* ---------- 캐릭터 CRUD ---------- */
 
-  // nickname을 넘기면 그 이름으로 미리 채워 등록해요('발견된 닉네임' 칩 원클릭 등록).
+  // nickname을 넘기면 그 이름으로 미리 채워 등록 ('발견된 닉네임' 칩)
   function addCharacter(nickname) {
     const c = {
       id: uid(),
@@ -442,7 +435,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     expandedCharId = c.id; // 새 캐릭터는 펼친 채로 시작해 바로 입력으로 이어지게
     saveCharacters();
     renderCharList();
-    renderPreview(); // 닉네임이 미리 채워진 등록이면 미리보기·발견된 닉네임 칩이 바로 갱신돼요.
+    renderPreview(); // 미리보기·발견된 닉네임 칩 갱신
     const firstInput = document.querySelector('.char-row[data-id="' + c.id + '"] .char-fields input');
     if (firstInput) firstInput.focus();
   }
@@ -463,6 +456,76 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     saveCharacters();
   }
 
+  /* ---------- 캐릭터 순서 바꾸기 ---------- */
+
+  // 화면(#charList)의 행 순서를 characters 배열에 반영.
+  // 필터로 일부만 보일 땐 보이는 캐릭터끼리의 상대 순서만 바꾸고 나머지는 제자리 유지.
+  function persistOrderFromDom() {
+    const domIds = Array.from(document.querySelectorAll('#charList .char-row')).map(r => r.dataset.id);
+    const shown = new Set(domIds);
+    const slots = [];
+    characters.forEach((c, i) => { if (shown.has(c.id)) slots.push(i); });
+    const byId = new Map(characters.map(c => [c.id, c]));
+    domIds.forEach((id, k) => {
+      const c = byId.get(id);
+      if (c && slots[k] !== undefined) characters[slots[k]] = c;
+    });
+    saveCharacters();
+    renderCharList();
+  }
+
+  // 드래그 핸들 — 마우스·터치 드래그와 키보드 ↑/↓로 순서 변경. 같은 목록 안에서만 이동.
+  function attachRowDrag(handle, row) {
+    handle.addEventListener('pointerdown', (e) => {
+      if (e.button !== undefined && e.button !== 0) return;
+      e.preventDefault();
+      const container = row.parentElement;
+      row.classList.add('dragging');
+      try { handle.setPointerCapture(e.pointerId); } catch (err) { /* 포인터 캡처 미지원 시 무시 */ }
+
+      const onMove = (ev) => {
+        const y = ev.clientY;
+        const rows = Array.from(container.children).filter(el => el !== row && el.classList && el.classList.contains('char-row'));
+        let target = null;
+        for (const sib of rows) {
+          const r = sib.getBoundingClientRect();
+          if (y < r.top + r.height / 2) { target = sib; break; }
+        }
+        if (target) {
+          if (row.nextSibling !== target) container.insertBefore(row, target);
+        } else {
+          const last = rows[rows.length - 1];
+          if (last) last.after(row);
+        }
+      };
+      const onUp = () => {
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        handle.removeEventListener('pointercancel', onUp);
+        row.classList.remove('dragging');
+        persistOrderFromDom();
+      };
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+      handle.addEventListener('pointercancel', onUp);
+    });
+
+    handle.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+      e.preventDefault();
+      const container = row.parentElement;
+      const rows = Array.from(container.children).filter(el => el.classList && el.classList.contains('char-row'));
+      const idx = rows.indexOf(row);
+      if (e.key === 'ArrowUp' && idx > 0) container.insertBefore(row, rows[idx - 1]);
+      else if (e.key === 'ArrowDown' && idx < rows.length - 1) rows[idx + 1].after(row);
+      else return;
+      persistOrderFromDom();
+      // 리렌더 후에도 같은 핸들에 포커스 유지 (연속 이동용)
+      const again = document.querySelector('.char-row[data-id="' + row.dataset.id + '"] .char-drag-handle');
+      if (again) again.focus();
+    });
+  }
+
   function createCharRow(c) {
       const row = document.createElement('div');
       row.className = 'char-row';
@@ -470,8 +533,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const isOpen = expandedCharId === c.id;
       if (isOpen) row.classList.add('open');
 
-      /* ----- 머리줄 (항상 표시): 아바타 칩 + 이름 + [나] 배지 + 출력 토글 + 화살표 -----
-         아바타 칩이 배경색·글씨색·이모지를 그대로 보여줘서, 접혀 있어도 설정을 한눈에 알 수 있어요. */
+      /* ----- 머리줄 (항상 표시): 핸들 + 아바타 칩 + 이름 + [나] 배지 + 출력 토글 + 화살표 ----- */
       const head = document.createElement('div');
       head.className = 'char-head';
 
@@ -493,7 +555,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       }
       summary.appendChild(avatarPreview);
 
-      // 아바타 미리보기를 현재 상태(이미지 우선 → 이모지 → 색상만)에 맞춰 다시 그려요.
+      // 아바타 미리보기 갱신 (이미지 → 이모지 → 색상만 순)
       function refreshAvatarPreview() {
         if (c.avatarType === 'image' && c.avatarValue) {
           avatarPreview.innerHTML = '<img src="' + c.avatarValue + '" alt="">';
@@ -503,7 +565,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         }
       }
 
-      // 머리줄 이름 — 표시 이름 → 닉네임 순서로 보여주고, 입력 중 실시간으로 갱신돼요.
+      // 머리줄 이름 (표시 이름 → 닉네임)
       const nameEl = document.createElement('span');
       nameEl.className = 'char-name';
       function refreshName() {
@@ -530,9 +592,17 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         expandedCharId = isOpen ? null : c.id;
         renderCharList();
       });
+      const dragHandle = document.createElement('button');
+      dragHandle.type = 'button';
+      dragHandle.className = 'char-drag-handle';
+      dragHandle.textContent = '⠿';
+      dragHandle.title = '끌어서 순서 바꾸기 (키보드 ↑↓)';
+      dragHandle.setAttribute('aria-label', '순서 바꾸기');
+      attachRowDrag(dragHandle, row);
+      head.appendChild(dragHandle);
       head.appendChild(summary);
 
-      // 출력 포함 여부 (세션 상태) — 자주 쓰는 토글이라 접힌 머리줄에 남겨둬요.
+      // 출력 포함 토글 (세션 상태)
       const outLabel = document.createElement('label');
       outLabel.className = 'out-check';
       outLabel.title = '끄면 이 캐릭터 대사가 미리보기·이미지·복사에서 빠져요.';
@@ -565,7 +635,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       emojiInput.value = c.emojiText || '';
       emojiInput.addEventListener('input', () => {
         const val = emojiInput.value;
-        // 이모지는 항상 기억해두되, 사진이 올려져 있으면 사진을 우선해서 아바타는 안 바뀌어요.
+        // 이모지는 항상 기억, 사진이 있으면 사진 우선
         const patch = { emojiText: val };
         if (c.avatarType !== 'image') {
           patch.avatarType = 'emoji';
@@ -599,13 +669,13 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       });
       uploadLabel.appendChild(fileInput);
 
-      // 사진 비우기 — 사진을 지우고, 이모지란에 적어둔 게 있으면 그걸로 아바타가 돌아가요.
+      // 사진 비우기 — 지우면 이모지 아바타로 복귀
       const clearPhotoBtn = document.createElement('button');
       clearPhotoBtn.type = 'button';
       clearPhotoBtn.className = 'clear-photo-btn';
       clearPhotoBtn.textContent = '사진 비우기';
       clearPhotoBtn.addEventListener('click', () => {
-        // 사진이 없으면 지울 것도 없어요.
+        // 사진 없으면 무시
         if (c.avatarType !== 'image' || !c.avatarValue) return;
         if (!confirm('이 캐릭터의 프로필 사진을 지울까요?')) return;
         updateCharacter(c.id, { avatarType: 'emoji', avatarValue: c.emojiText || '', avatarThumb: '' });
@@ -613,7 +683,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         renderPreview();
       });
 
-      // ----- 필드 그리드: 모든 줄을 [라벨 | 컨트롤]로 정렬해 한눈에 훑을 수 있게 -----
+      // ----- 필드 그리드: [라벨 | 컨트롤] 줄 정렬 -----
       const fields = document.createElement('div');
       fields.className = 'char-fields';
 
@@ -634,7 +704,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         return sep;
       }
 
-      // 색·이름을 만지면 결과가 바로 보이는 작은 대사 미리보기 칩
+      // 실시간 대사 미리보기 칩
       const sample = document.createElement('div');
       sample.className = 'char-sample';
       const sampleName = document.createElement('span');
@@ -697,7 +767,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         renderPreview();
       });
 
-      // '내 캐릭터' 지정 — 내가 보낸 귓속말을 이 캐릭터 이름으로 표시해요. 한 명만 지정돼요.
+      // '내 캐릭터' 지정 — 보낸 귓속말의 화자. 한 명만 가능
       const meLabel = document.createElement('label');
       meLabel.className = 'me-check';
       const meInput = document.createElement('input');
@@ -721,14 +791,14 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       fields.appendChild(fieldRow('표시 이름', dispInput));
       fields.appendChild(fieldSep());
 
-      // ② 모습 — 색·아바타, 그리고 결과가 바로 보이는 미리보기 칩
+      // ② 모습 — 색·아바타·미리보기 칩
       fields.appendChild(fieldRow('배경색', bgInput, linkHexInput(bgInput)));
       fields.appendChild(fieldRow('글씨색', colorInput, linkHexInput(colorInput)));
       fields.appendChild(fieldRow('아바타', emojiInput, uploadLabel, clearPhotoBtn));
       fields.appendChild(fieldRow('미리보기', sample));
       fields.appendChild(fieldSep());
 
-      // 내 캐릭터 / 삭제
+      // ③ 기타 — 내 캐릭터 / 삭제
       const foot = document.createElement('div');
       foot.className = 'char-foot';
       foot.appendChild(meLabel);
@@ -778,7 +848,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return;
     }
 
-    // 출력에 표시되는 캐릭터는 그대로, 숨긴 캐릭터는 아래 접이식 섹션으로 모아요.
+    // 숨긴 캐릭터는 접이식 섹션으로 분리
     const shown = visible.filter(c => !hiddenOutputIds.has(c.id));
     const hidden = visible.filter(c => hiddenOutputIds.has(c.id));
 
@@ -817,25 +887,21 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   function stripDecoration(name) {
     // 닉네임 맨 앞에 붙는 파판 전용 아이콘 문자(파티 번호 등)는 한글/영문/숫자가 아니므로 제거
     const cleaned = (name || '').replace(/^[^0-9A-Za-z가-힣]+/, '').trim();
-    // 닉네임 끝에 붙은 서버명(펜리르 등)도 떼어내요.
+    // 닉네임 끝의 서버명 제거
     return stripServerSuffix(cleaned);
   }
 
-  // 감정표현(나래이션)은 등록된 닉네임으로 시작하는 줄이에요. 게임 기본 감표("○○가 인사한다"),
-  // 조사가 다른 경우("○○를/은/는…"), 사용자 지정 감표("○○ 행복하게 웃는다", "○○. ---한다")까지
-  // 폭넓게 잡아요. 단:
-  //   - 대사("○○: 안녕")는 닉네임 뒤에 ':'가 오므로 감표가 아니에요.
-  //   - 시스템 메시지("○○님이 파티에 참가하셨습니다")는 닉네임 뒤에 '님'(조사 아님)이 붙어
-  //     아래 경계 검사에 안 걸리므로 자연히 감표에서 빠져 시스템 줄로 처리돼요.
-  // 한글 조사 목록 — 긴 조사부터 적어 "이랑"이 "이"로 잘못 끊기지 않게 해요.
+  // 감정표현(나래이션) 판정: 등록된 닉네임으로 시작하는 줄.
+  //   - "○○: 대사"는 콜론이 있어 감표 아님
+  //   - "○○ 님이 …"(공백+님)는 게임 시스템 로그라 감표 아님
+  // 한글 조사 목록 (긴 것부터 — "이랑"이 "이"로 끊기지 않게)
   const EMOTE_PARTICLES = ['에게서', '이랑', '에게', '께서', '에서', '으로', '이', '가', '은', '는',
     '을', '를', '와', '과', '도', '만', '의', '랑', '께', '에', '로'];
-  // 닉네임/조사 바로 뒤에 와도 되는 '경계' 문자(공백·문장부호). 이게 와야 더 긴 이름의 일부를
-  // 감표로 오인("민" + "수가…")하지 않아요.
+  // 닉네임/조사 뒤에 올 수 있는 경계 문자(공백·문장부호) — 더 긴 이름 오인 방지
   const EMOTE_BOUNDARY = /^[\s.,!?~…·"'\-]/;
 
   function tryParseEmote(rest) {
-    // "닉네임 >> 메시지"(받은 귓속말)는 닉네임으로 시작하지만 감표가 아니라 대사예요. parseRest로 넘겨요.
+    // "닉네임 >> 메시지"(받은 귓속말)는 감표 아님 → parseRest로
     if (/^[^:：>]+>>/.test(rest)) return null;
     const sorted = characters
       .map(c => ({ nick: normalizeNick(c.nickname) }))
@@ -845,9 +911,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       if (!rest.startsWith(c.nick)) continue;
       const after = rest.slice(c.nick.length);
       if (after === '' || after[0] === ':' || after[0] === '：') continue; // 닉네임만/대사 → 감표 아님
-      // "○○ 님이 …"(공백 뒤 '님')은 게임 시스템 존댓말 로그 → 감표 아님(parseRest로).
+      // "○○ 님이 …"(공백+님) → 시스템 로그, 감표 아님
       if (/^\s+님/.test(after)) continue;
-      // "○○님 …"(공백 없이 바로 '님')은 사용자 표현이라 감표로 봐요.
+      // "○○님 …"(붙은 님) → 사용자 표현, 감표
       if (after.startsWith('님')) {
         return { channelType: 'emote', channel: '감정표현', nickname: c.nick, message: rest };
       }
@@ -865,12 +931,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
           }
         }
       }
-      // 경계 없이 다른 한글이 이어지면(님이…, 더 긴 이름의 일부 등) 감표 아님 → parseRest로 넘겨요.
+      // 경계 없이 한글이 이어지면 감표 아님 → parseRest로
     }
     return null;
   }
 
-  // 메시지 맨 앞에 등장하는 '등록된 닉네임'을 찾아요(감표↔시스템 스왑 시 알약 색을 살리려고).
+  // 메시지 맨 앞의 등록 닉네임 탐색 (스왑된 감표의 알약 색용)
   function leadingRegisteredNick(text) {
     const t = text || '';
     const sorted = characters
@@ -887,7 +953,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     let m = rest.match(/^>>\s*([^:：]+)[:：]\s?(.*)$/);
     if (m) {
       const to = stripDecoration(m[1]);
-      // nickname에는 받는 상대를 넣어두되, 표시는 렌더링 단계에서 '내 캐릭터'로 바꿔요.
+      // nickname엔 받는 상대 저장, 표시는 렌더링 때 '내 캐릭터'로
       return { channelType: 'whisper-out', channel: '귓속말', nickname: to, recipient: to, message: m[2] };
     }
 
@@ -907,8 +973,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     m = rest.match(/^\[([^\]]+)\]\s*(.*)$/);
     if (m) return { channelType: 'system', channel: m[1].trim(), nickname: '', message: m[2] };
 
-    // 닉네임에는 공백이 없으므로, 콜론 '앞 첫 단어'에 공백이 없을 때만 대사로 봐요.
-    // (예: "오케스트리온 악보: …"처럼 콜론 앞에 공백이 있으면 대사가 아니라 시스템 로그로 넘어가요.)
+    // 닉네임엔 공백이 없으므로 콜론 앞 첫 단어에 공백이 없을 때만 대사로 판정
     m = rest.match(/^([^\s:：]+)[:：]\s?(.*)$/);
     if (m) return { channelType: 'say', channel: '말하기', nickname: stripDecoration(m[1]), message: m[2] };
 
@@ -917,8 +982,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   const TIME_RE = /^\[(\d{1,2}:\d{2}(?::\d{2})?)\]/;
 
-  // FFXIV 로그를 복붙하면 게임 전용 글리프가 '사설영역(PUA)' 문자로 들어와 □/깨진 모양으로 보여요.
-  // 이런 깨져 보이는 특수문자만 골라 제거해요. 일반 글자·공백(정렬용)·작은따옴표·이모지는 보존해요.
+  // 게임 전용 글리프(PUA)·제어문자 등 깨진 문자만 제거. 일반 글자·공백·이모지는 보존
   function sanitizeLogText(text) {
     return (text || '')
       .replace(/[\uE000-\uF8FF]/g, '')                // 사설영역(게임 아이콘 글리프)
@@ -930,9 +994,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   function parseLog(text) {
     const lines = sanitizeLogText(text).split(/\r?\n/);
-    // 로그에 시간 표기가 하나라도 있으면 '시간 표시 켜짐' 모드로 봐요. 이때는 [HH:MM]이 없는 줄을
-    // 직전 메시지의 줄바꿈 연결로 처리하지만, 시간 표기가 아예 없는 로그(시간 표시 꺼짐)에서는
-    // 모든 줄에 시간이 없으니 이 규칙을 끄지 않으면 시스템 로그가 앞 줄에 흡수돼버려요.
+    // 시간 표기가 하나라도 있으면 [HH:MM] 없는 줄을 직전 메시지의 줄바꿈으로 연결.
+    // 시간 표기가 아예 없는 로그에서는 이 규칙을 꺼서 시스템 줄이 흡수되지 않게 함.
     const anyTimed = lines.some(l => TIME_RE.test(l));
     const entries = [];
     for (const line of lines) {
@@ -954,20 +1017,19 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
       const parsed = parseRest(rest);
 
-      // 시간 표시가 켜진 로그에서 [HH:MM]이 없고 채널/닉네임 패턴도 못 알아본 줄은
-      // 직전 메시지가 줄바꿈으로 이어진 것으로 보고 합쳐줘요. (시간 표기 자체가 없는 로그는 제외)
+      // [HH:MM]도 채널/닉네임 패턴도 없는 줄은 직전 메시지에 줄바꿈으로 연결
       if (parsed.unparsed && !timeMatch && anyTimed && entries.length > 0) {
         entries[entries.length - 1].message += '\n' + line;
       } else {
         entries.push(Object.assign({ time, raw: line }, parsed));
       }
     }
-    // 사용자가 미리보기에서 감표↔시스템으로 직접 바꾼 줄을 반영해요.
+    // 감표↔시스템 수동 전환 반영
     entries.forEach(applySwapOverride);
     return entries;
   }
 
-  // 감표↔시스템 수동 전환을 적용해요. 감표/시스템 줄에만 의미가 있어요.
+  // 감표↔시스템 수동 전환 적용 (감표/시스템 줄에만 의미)
   function applySwapOverride(entry) {
     const ov = swapOverrides.get(entry.raw);
     if (!ov) return;
@@ -978,7 +1040,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     } else if (ov === 'system' && entry.channelType === 'emote') {
       entry.channelType = 'system';
       entry.channel = '';
-      entry.nickname = ''; // 시스템 줄은 닉네임 없이 가운데 정렬로 표시돼요.
+      entry.nickname = ''; // 시스템 줄은 닉네임 없음
     }
   }
 
@@ -1012,8 +1074,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     entries.forEach(entry => {
       const key = getFilterKey(entry);
       if (!seen.includes(key)) seen.push(key);
-      // 처음 보는 채널은 기본 켜짐 — 붙여넣자마자 결과가 보여야 해요.
-      // 단 태그 없는 잡다한 시스템 줄이 모이는 '시스템/기타'만 기본 꺼짐.
+      // 처음 보는 채널은 기본 켜짐. 태그 없는 시스템 줄이 모이는 '시스템/기타'만 기본 꺼짐
       if (!(key in channelFilterState)) channelFilterState[key] = (key !== '시스템/기타');
     });
 
@@ -1075,7 +1136,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     });
   }
 
-  // 마지막으로 파싱한 전체 항목 — 빈 미리보기 원인 진단과 '발견된 닉네임' 칩에 써요.
+  // 마지막 파싱 결과 — 빈 미리보기 진단과 '발견된 닉네임' 칩에 사용
   let lastParsedEntries = [];
 
   function getFilteredEntries(text) {
@@ -1085,11 +1146,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     renderChannelFilter(entries);
     return entries.filter(entry => {
       if (channelFilterState[getFilterKey(entry)] === false) return false;
-      // 시스템 알림(닉네임 없음)은 사람의 대화가 아니므로 '등록된 닉네임만 표시'와 무관하게,
-      // 채널 필터만 켜져 있으면 보여줘요.
+      // 시스템 알림(닉네임 없음)은 '등록된 닉네임만 표시'와 무관, 채널 필터만 적용
       if (!entry.nickname) return true;
       const char = charForEntry(entry);
-      // 출력에서 제외한 캐릭터의 대사는 숨겨요.
+      // 출력 제외 캐릭터는 숨김
       if (char && hiddenOutputIds.has(char.id)) return false;
       if (onlyRegistered && !char) return false;
       return true;
@@ -1098,7 +1158,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   /* ---------- 미리보기 렌더링 ---------- */
 
-  // 감정표현(나래이션)은 캐릭터 색 알약을 가운데에, 시간은 시스템 로그처럼 오른쪽 끝에 둬요.
+  // 감정표현: 캐릭터 색 알약 가운데, 시간은 오른쪽 끝
   function buildEmoteLineNode(entry, char) {
     const line = document.createElement('div');
     line.className = 'log-line is-emote';
@@ -1136,10 +1196,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return line;
   }
 
-  // 말풍선에 메타(이름·채널)·메시지·시간을 채워요.
-  // - 이름/채널이 있으면: 메타 줄(이름·채널·시간) + 메시지 (기존 모양)
-  // - 이름·채널이 모두 없고 시간만 있으면: 메시지와 시간을 '한 줄'에 둬서 말풍선이 세로로 얇아져요.
-  // - 아무것도 없으면: 메시지만.
+  // 말풍선 내용 채우기:
+  // - 메타(이름·채널) 있으면 메타 줄 + 메시지
+  // - 메타 없고 시간만 있으면 메시지·시간 한 줄
+  // - 둘 다 없으면 메시지만
   function fillBubble(bubble, meta, msg, timeText) {
     const mkTime = () => {
       const s = document.createElement('span');
@@ -1162,8 +1222,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
   }
 
-  // 귓속말은 사적인 느낌이 나도록 반투명·이탤릭으로 조용하게 표시해요.
-  // 보낸 귓속말은 '내 캐릭터' 이름으로 왼쪽에, 받은 귓속말은 상대 아바타를 오른쪽에 두고 우측 정렬해요.
+  // 귓속말: 반투명 테두리 + 이탤릭
   function buildWhisperNode(entry) {
     const isOut = entry.channelType === 'whisper-out';
     const char = isOut ? getMyCharacter() : findCharacterByNickname(entry.nickname);
@@ -1195,11 +1254,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const meta = document.createElement('div');
     meta.className = 'log-meta';
 
-    // 보낸/받은 귓속말 모두 "보낸사람 → 받은사람" 형식으로 통일해요.
+    // "보낸사람 → 받은사람" 형식으로 통일
     const senderName = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
     const receiverName = isOut ? nickToDisplay(entry.recipient) : myDisplayName();
 
-    // 이름(보낸이→받은이)은 '이름 표시'에, '귓속말' 라벨은 채널 종류이므로 '채널 이름 표시'에 따라요.
+    // 이름은 '이름 표시', '귓속말' 라벨은 '채널 이름 표시' 설정을 따름
     if (shouldShowName()) {
       const nameSpan = document.createElement('span');
       nameSpan.className = 'log-name';
@@ -1226,8 +1285,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return line;
   }
 
-  // 시스템 알림(공지·토벌 종료 등)은 조용한 한 줄로. 'unknown'은 라벨 없이 본문만, [이벤트]처럼
-  // 의미있는 대괄호 채널만 작은 태그로 붙여요.
+  // 시스템 알림: 조용한 한 줄. 'unknown'은 본문만, 의미 있는 대괄호 채널만 태그로
   function buildSystemLineNode(entry) {
     const line = document.createElement('div');
     line.className = 'log-line is-system';
@@ -1236,7 +1294,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     inner.className = 'log-system';
     inner.style.color = settings.sysColor;
 
-    // 좌우 spacer를 같은 너비(flex:1)로 둬서 가운데 내용은 중앙에, 시간은 오른쪽 끝에 정렬돼요.
+    // 좌우 spacer 동일 너비 → 본문 중앙, 시간 오른쪽 끝
     const leftSpacer = document.createElement('span');
     leftSpacer.className = 'log-system-spacer';
     inner.appendChild(leftSpacer);
@@ -1251,7 +1309,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
     const msg = document.createElement('span');
     msg.className = 'log-system-msg';
-    // 시스템 로그에 붙은 서버명을 떼고, 등록 닉네임은 표시 이름으로 바꿔줘요.
+    // 서버명 제거 + 등록 닉네임 → 표시 이름
     msg.innerHTML = escapeHtml(formatSystemText(entry.message)).replace(/\n/g, '<br>');
     center.appendChild(msg);
     inner.appendChild(center);
@@ -1270,8 +1328,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return line;
   }
 
-  // 감표/시스템 줄에 '감표로 ⇄ 시스템으로' 전환 버튼을 달아줘요. 줄에 마우스를 올리면 나타나고,
-  // 이미지 저장(html2canvas)·서식/텍스트 복사에는 들어가지 않아요(미리보기 DOM에만 있는 요소).
+  // 감표 ⇄ 시스템 전환 버튼 — hover 시 표시, 내보내기에는 미포함(미리보기 전용 DOM)
   function addSwapButton(lineNode, entry) {
     const toEmote = entry.channelType !== 'emote'; // 지금이 시스템이면 감표로, 감표면 시스템으로
     const btn = document.createElement('button');
@@ -1288,7 +1345,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     lineNode.appendChild(btn);
   }
 
-  // 로그에서 발견됐지만 아직 등록되지 않은 닉네임을 칩으로 보여줘요. 클릭 한 번으로 등록.
+  // 미등록 닉네임 칩 — 클릭 한 번으로 등록
   const FOUND_NICKS_MAX = 15;
   function renderFoundNicks(entries) {
     const box = document.getElementById('foundNicks');
@@ -1332,7 +1389,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
   }
 
-  // 미리보기가 비었을 때, 왜 비었는지 원인별로 알려줘요.
+  // 빈 미리보기 원인 진단 문구
   function emptyNoticeText(text) {
     if (!text.trim()) return '로그를 붙여넣으면 자동으로 변환됩니다.';
     const entries = lastParsedEntries || [];
@@ -1357,7 +1414,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     filtered.forEach(entry => {
       const char = findCharacterByNickname(entry.nickname);
       const isEmote = entry.channelType === 'emote';
-      // 감표(스왑으로 닉네임이 비었을 수도 있음)를 먼저 가려내고, 그 외 닉네임 없는 줄을 시스템으로.
+      // 감표 먼저 판정, 그 외 닉네임 없는 줄은 시스템
       const isSystem = !isEmote && !entry.nickname;
 
       if (entry.channelType === 'whisper-out' || entry.channelType === 'whisper-in') {
@@ -1446,7 +1503,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       alert('내보낼 로그가 없습니다. 로그를 붙여넣어 주세요.');
       return;
     }
-    // 긴 로그는 캡처에 몇 초 걸려요 — 저장 중임을 버튼으로 알리고 중복 클릭을 막아요.
+    // 캡처 중 버튼 비활성화로 중복 클릭 방지
     const busyBtn = btnId ? document.getElementById(btnId) : null;
     if (busyBtn && busyBtn.disabled) return;
     const busyText = busyBtn ? busyBtn.textContent : '';
@@ -1464,7 +1521,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const scale = 2;
     // 보이는 영역 정보(펼치기 전에 기록)
     const view = { top: node.scrollTop, left: node.scrollLeft, w: node.clientWidth, h: node.clientHeight };
-    // 전체 내용이 다 캡처되도록 잠시 펼쳐요.
+    // 전체 캡처를 위해 잠시 펼침
     const prev = { height: node.style.height, maxHeight: node.style.maxHeight, overflow: node.style.overflow };
     function restore() {
       node.style.height = prev.height;
@@ -1505,13 +1562,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   }
 
   /* ---------- 서식 복사 (클립보드) ---------- */
-  /* 구글 문서·워드 등은 div의 배경/둥근모서리/패딩이나 표 폭을 제멋대로 바꿔서 큰 색 덩어리로
-     둔탁해져요. 그래서 여기서는 '대화록' 스타일로 가볍게 포장합니다 — 이름만 캐릭터 색 칩으로
-     강조하고, 메시지는 그 아래 일반 텍스트로. 어떤 에디터에 붙여도 깔끔하게 읽혀요. */
+  /* 에디터가 서식을 왜곡해도 안전한 '대화록' 스타일 — 이름만 색 칩, 메시지는 일반 텍스트 */
   const COPY_FONT = "font-family:'Malgun Gothic','Noto Sans KR',sans-serif;";
 
-  // 사진 칸 아바타 = 항상 '원형 이미지'로. 사진은 원형 썸네일, 그 외엔 색 동그라미(+이모지/글씨)를
-  // 즉석에서 이미지로 그려 넣어요. 이미지라서 빈 동그라미도 에디터에서 안 사라지고 둥글게 보여요.
+  // 아바타는 항상 원형 이미지(사진 썸네일 또는 즉석 색 동그라미) — 에디터에서 형태 유지
   function copyAvatarCellHtml(char, fallbackText) {
     let url;
     if (char && char.avatarType === 'image' && char.avatarThumb) {
@@ -1527,14 +1581,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return '<img src="' + url + '" width="36" height="36" style="width:36px;height:36px;border-radius:50%;object-fit:cover;display:inline-block;vertical-align:middle;">';
   }
 
-  // 오른쪽 끝 시간 칸 (시간 표시 켜진 경우에만). 대사 칸과 같이 세로 가운데로 맞춰요.
+  // 오른쪽 끝 시간 칸 (시간 표시 시)
   function copyTimeCell(timeHtml) {
     return '<td width="46" valign="middle" style="width:46px;border:none;padding:7px 4px 7px 4px;text-align:right;color:#999;font-size:11px;font-family:\'DM Mono\',Consolas,monospace;white-space:nowrap;">' + (timeHtml || '') + '</td>';
   }
 
-  // [색 줄][아바타][이름·메시지]( [시간] ) 행. 색 줄은 캐릭터 배경색이라 사진을 넣어도 캐릭터 색이 남아요.
-  // 아바타·대사 칸을 valign=middle로 두고 위아래 여백을 대칭(7px)으로 맞춰, 대사가 아바타와 세로
-  // 가운데로 나란히 보이게 해요. 이름·채널이 없으면 머리글 줄을 아예 빼서 깔끔하게 가운데 맞춰요.
+  // [색 줄][아바타][이름·메시지][시간] 행. 색 줄은 캐릭터 배경색. 이름·채널 없으면 머리글 생략
   function copyMsgRow(barColor, avatarHtml, headerHtml, bodyHtml, italic, timeHtml) {
     const headerDiv = headerHtml ? '<div style="font-size:14px;line-height:1.5;">' + headerHtml + '</div>' : '';
     return '<tr>' +
@@ -1562,7 +1614,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     '</tr>';
   }
 
-  // 메시지 하나를 표의 '행(tr)'으로 만들어요. 전체는 copyFormatted에서 표 하나로 감쌉니다.
+  // 메시지 하나 → 표의 행(tr). 전체는 copyFormatted에서 표 하나로 묶음
   function buildLineHtml(entry) {
     const char = findCharacterByNickname(entry.nickname);
     const isEmote = entry.channelType === 'emote';
@@ -1593,7 +1645,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
       const metaParts = [];
       if (shouldShowName()) metaParts.push('→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()));
-      if (shouldShowChannel()) metaParts.push('귓속말'); // '귓속말'은 채널 표시에 따라요.
+      if (shouldShowChannel()) metaParts.push('귓속말'); // '귓속말' 라벨은 채널 표시 설정을 따름
       const meta = metaParts.join(' · ');
       const header = (shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' : '') +
         (meta ? (shouldShowName() ? ' ' : '') + '<span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>' : '');
@@ -1614,7 +1666,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
      티스토리·블로그 HTML 모드나 웹페이지는 진짜 브라우저로 렌더링하므로, 미리보기 모습
      (둥근 말풍선·아바타 원·귓속말 반투명·감정표현 알약)을 그대로 인라인 스타일로 재현해요. */
 
-  // 오른쪽 끝에 붙는 시간 — 미리보기(.log-time)처럼 모노스페이스로.
+  // 시간 span — 미리보기(.log-time)와 동일한 모노스페이스
   function richTimeHtml(time) {
     if (!time) return '';
     return '<span style="margin-left:auto;font-size:10.5px;opacity:0.6;font-family:\'DM Mono\',monospace;white-space:nowrap;">' + escapeHtml(time) + '</span>';
@@ -1669,8 +1721,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const time = (entry.time && shouldShowTime()) ? entry.time : '';
     const msgHtml = escapeHtml(entry.message).replace(/\n/g, '<br>');
 
-    // 시스템 알림 — 가운데 본문 좌우로 옅어지는 장식 헤어라인(미리보기와 동일).
-    // 오른쪽 선은 항상 깔리고, 시간이 있으면 그 선 끝에 붙어 좌우가 대칭이에요.
+    // 시스템 알림 — 좌우 장식 헤어라인(미리보기와 동일). 시간은 오른쪽 선 끝에
     if (isSystem) {
       const hairL = '<span style="flex:1 1 0;align-self:center;height:1px;background:linear-gradient(90deg,transparent,currentColor);opacity:0.25;"></span>';
       const hairR = '<span style="flex:1 1 0;height:1px;background:linear-gradient(90deg,currentColor,transparent);opacity:0.25;"></span>';
@@ -1712,7 +1763,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const name = isOut ? myDisplayName() : nickToDisplay(entry.nickname);
       const metaParts = [];
       if (shouldShowName()) metaParts.push('→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()));
-      if (shouldShowChannel()) metaParts.push('귓속말'); // '귓속말'은 채널 표시에 따라요.
+      if (shouldShowChannel()) metaParts.push('귓속말'); // '귓속말' 라벨은 채널 표시 설정을 따름
       const meta = metaParts.join(' ');
       const av = richAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?'), 36, 1);
       const header = (shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b> ' : '') +
@@ -1744,7 +1795,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
     if (entry.channelType === 'whisper-out' || entry.channelType === 'whisper-in') {
       const isOut = entry.channelType === 'whisper-out';
-      const wTag = shouldShowChannel() ? '(귓속말)' : ''; // '귓속말'은 채널 표시에 따라요.
+      const wTag = shouldShowChannel() ? '(귓속말)' : ''; // '귓속말' 라벨은 채널 표시 설정을 따름
       if (!shouldShowName()) return timeLabel + (wTag ? wTag + ' ' : '') + entry.message;
       const dir = isOut
         ? myDisplayName() + ' → ' + nickToDisplay(entry.recipient)
@@ -1752,7 +1803,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return timeLabel + dir + (wTag ? ' ' + wTag : '') + ': ' + entry.message;
     }
 
-    // 감정표현은 본문에 행위자가 들어있고, 시스템은 이름·채널 라벨이 불필요해요.
+    // 감표는 본문에 행위자 포함, 시스템은 라벨 불필요
     if (isEmote) {
       return timeLabel + applyDisplayNames(entry.message);
     }
@@ -1781,9 +1832,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return;
     }
 
-    // 메시지 행들을 표 하나로 감싸요 (메시지마다 표를 따로 만들면 에디터가 사이에 빈 줄을 넣어요).
-    // 가로 100%로 늘려 감정표현·시스템 행이 페이지 중앙에 오게 하고, colgroup으로 칸 폭을 고정해요.
-    // 시간 표시가 켜져 있으면 맨 오른쪽에 시간 칸(46px)을 추가해 시간을 우측 정렬해요.
+    // 표 하나로 묶어 에디터가 빈 줄을 넣지 않게. colgroup으로 칸 폭 고정, 시간 칸은 옵션
     const colgroup = shouldShowTime()
       ? '<colgroup><col style="width:3px;"><col style="width:46px;"><col><col style="width:46px;"></colgroup>'
       : '<colgroup><col style="width:3px;"><col style="width:46px;"><col></colgroup>';
@@ -1804,7 +1853,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         return;
       }
     } catch (e) {
-      // 실패하면 아래 구형 방식으로 시도
+      // 실패 시 아래 구형 방식으로 폴백
     }
 
     // 2차 fallback: 화면 밖에 임시 영역을 만들어 선택한 뒤 execCommand로 복사
@@ -1855,7 +1904,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         return;
       }
     } catch (e) {
-      // 실패하면 아래 구형 방식으로 시도
+      // 실패 시 아래 구형 방식으로 폴백
     }
 
     // 2차 fallback: 임시 textarea로 선택 후 execCommand 복사
@@ -1880,7 +1929,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     }
   }
 
-  // HTML '코드 자체'를 텍스트로 복사 — 티스토리/블로그 HTML 편집 모드에 붙여넣으면 모습 그대로 살아나요.
+  // HTML 코드 자체를 텍스트로 복사 (블로그 HTML 편집 모드용)
   async function copyHtmlCode() {
     const text = document.getElementById('logInput').value;
     const filtered = getFilteredEntries(text);
@@ -1899,7 +1948,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         return;
       }
     } catch (e) {
-      // 실패하면 아래 구형 방식으로 시도
+      // 실패 시 아래 구형 방식으로 폴백
     }
 
     // 2차 fallback: 임시 textarea로 선택 후 execCommand 복사
@@ -2001,10 +2050,23 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     renderPreview();
   });
 
+  // 이름(표시 이름 → 닉네임) 가나다순 정렬. 다시 누르면 역순.
+  let charSortAsc = true;
+  document.getElementById('sortChars').addEventListener('click', (e) => {
+    const label = c => (c.displayName || c.nickname || '');
+    characters.sort((a, b) => charSortAsc
+      ? label(a).localeCompare(label(b), 'ko')
+      : label(b).localeCompare(label(a), 'ko'));
+    e.currentTarget.textContent = charSortAsc ? '가나다순 ▲' : '가나다순 ▼';
+    charSortAsc = !charSortAsc;
+    saveCharacters();
+    renderCharList();
+  });
+
   document.getElementById('clearBtn').addEventListener('click', () => {
     document.getElementById('logInput').value = '';
     renderPreview();
-    renderCharList(); // 로그가 비면 편집 목록은 전체로 돌아가요.
+    renderCharList(); // 로그가 비면 편집 목록은 전체 표시로
   });
 
   document.getElementById('resetBtn').addEventListener('click', () => {
@@ -2023,7 +2085,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       renderPreview();
-      renderCharList(); // 로그 내용이 바뀌면 등장 캐릭터 기준으로 편집 목록도 다시 좁혀요.
+      renderCharList(); // 등장 캐릭터 기준으로 목록 갱신
     }, 250);
   });
 
