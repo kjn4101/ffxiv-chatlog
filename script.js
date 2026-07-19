@@ -1559,9 +1559,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const hint = document.createElement('span');
     hint.className = 'log-edit-hint';
     hint.textContent = '로그 입력에도 반영돼요 · Enter 적용 · Shift+Enter 줄바꿈 · Esc 취소';
+    row.appendChild(hint);
     row.appendChild(applyBtn);
     row.appendChild(cancelBtn);
-    row.appendChild(hint);
 
     box.appendChild(ta);
     box.appendChild(row);
