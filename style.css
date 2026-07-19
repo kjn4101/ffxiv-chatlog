@@ -1475,6 +1475,10 @@
     opacity: 0.85;
     pointer-events: auto;
   }
+
+  /* 시스템 줄은 버튼보다 얇아서 그대로 두면 위로 삐져나옴 → 줄 살짝 아래로(줄 간격 안) */
+  .log-line.is-system .log-swap-btn,
+  .log-line.is-system .log-line-actions { bottom: -3px; }
   .log-swap-btn:hover { opacity: 1; color: var(--cyan); }
 
   /* 줄 수정·지우기 버튼 — hover 시 줄 안 오른쪽 아래에 표시 (미리보기 전용) */
