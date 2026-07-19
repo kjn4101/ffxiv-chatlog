@@ -1554,6 +1554,8 @@
     font-size: var(--text-2xs);
     border-radius: 5px;
     cursor: pointer;
+    flex-shrink: 0;       /* 창이 좁아져도 버튼 크기 고정 */
+    white-space: nowrap;
   }
 
   .log-edit-apply {
