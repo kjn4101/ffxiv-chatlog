@@ -768,7 +768,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         updateCharacter(c.id, { bg: bgInput.value });
         avatarPreview.style.background = bgInput.value;
         refreshSample();
-        schedulePreview();
+        setCharColorVars(c); // 미리보기는 CSS 변수만 갱신 → 드래그 중에도 즉시 반영
       });
 
       const colorInput = document.createElement('input');
@@ -779,7 +779,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         updateCharacter(c.id, { color: colorInput.value });
         avatarPreview.style.color = colorInput.value;
         refreshSample();
-        schedulePreview();
+        setCharColorVars(c); // 미리보기는 CSS 변수만 갱신 → 드래그 중에도 즉시 반영
       });
 
       // '내 캐릭터' 지정 — 보낸 귓속말의 화자. 한 명만 가능
@@ -1197,8 +1197,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const pill = document.createElement('span');
     pill.className = 'log-emote';
     if (char) {
-      pill.style.background = char.bg;
-      pill.style.color = char.color;
+      pill.style.background = charVar(char, 'bg');
+      pill.style.color = charVar(char, 'c');
     }
     const msg = document.createElement('span');
     msg.className = 'log-emote-msg';
@@ -1257,8 +1257,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const avatar = document.createElement('div');
     avatar.className = 'log-avatar';
     if (char) {
-      avatar.style.background = char.bg;
-      avatar.style.color = char.color;
+      avatar.style.background = charVar(char, 'bg');
+      avatar.style.color = charVar(char, 'c');
       if (char.avatarType === 'image' && char.avatarValue) {
         avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
       } else {
@@ -1272,8 +1272,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
     const bubble = document.createElement('div');
     bubble.className = 'log-bubble';
-    bubble.style.background = char ? darkenHex(char.bg, 0.22) : '#1c232e';
-    bubble.style.color = char ? char.color : '#e9e4d6';
+    bubble.style.background = char ? charVar(char, 'bgd') : '#1c232e';
+    bubble.style.color = char ? charVar(char, 'c') : '#e9e4d6';
 
     const meta = document.createElement('div');
     meta.className = 'log-meta';
@@ -1316,7 +1316,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
     const inner = document.createElement('div');
     inner.className = 'log-system';
-    inner.style.color = settings.sysColor;
+    inner.style.color = 'var(--sys-c)';
 
     // 좌우 spacer 동일 너비 → 본문 중앙, 시간 오른쪽 끝
     const leftSpacer = document.createElement('span');
@@ -1427,15 +1427,30 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return '남은 줄이 캐릭터의 ‘출력’ 체크 해제로 모두 숨겨져 있습니다. 캐릭터 행 오른쪽의 출력 체크를 확인해주세요.';
   }
 
-  // 색상 피커 드래그·타이핑처럼 연속 발생하는 입력용 — 입력이 잦아든 뒤 한 번만 재생성.
-  // 매 이벤트마다 로그 전체를 다시 그리면 긴 로그에서 드래그가 버벅임.
+  // 타이핑처럼 연속 발생하는 입력용 — 입력이 잦아든 뒤 한 번만 재생성.
+  // 매 이벤트마다 로그 전체를 다시 그리면 긴 로그에서 버벅임.
   let previewDebounce;
   function schedulePreview() {
     clearTimeout(previewDebounce);
     previewDebounce = setTimeout(renderPreview, 120);
   }
 
+  // 미리보기의 캐릭터 색은 CSS 변수로 참조 — 색상 드래그 중엔 변수 값만 바꿔서
+  // 전체 재생성 없이 즉시 반영. 귓속말 배경은 어둡게 만든 파생색이라 함께 갱신.
+  function setCharColorVars(c) {
+    const p = document.getElementById('preview');
+    p.style.setProperty('--ch-' + c.id + '-bg', c.bg);
+    p.style.setProperty('--ch-' + c.id + '-bgd', darkenHex(c.bg, 0.22));
+    p.style.setProperty('--ch-' + c.id + '-c', c.color);
+  }
+  function applyColorVars() {
+    characters.forEach(setCharColorVars);
+    document.getElementById('preview').style.setProperty('--sys-c', settings.sysColor);
+  }
+  function charVar(c, key) { return 'var(--ch-' + c.id + '-' + key + ')'; }
+
   function renderPreview() {
+    applyColorVars();
     const text = document.getElementById('logInput').value;
     const filtered = getFilteredEntries(text);
     renderFoundNicks(lastParsedEntries);
@@ -1472,8 +1487,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const avatar = document.createElement('div');
       avatar.className = 'log-avatar';
       if (char) {
-        avatar.style.background = char.bg;
-        avatar.style.color = char.color;
+        avatar.style.background = charVar(char, 'bg');
+        avatar.style.color = charVar(char, 'c');
         if (char.avatarType === 'image' && char.avatarValue) {
           avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
         } else {
@@ -1487,8 +1502,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
       const bubble = document.createElement('div');
       bubble.className = 'log-bubble';
-      bubble.style.background = char ? char.bg : '#242c39';
-      bubble.style.color = char ? char.color : '#e9e4d6';
+      bubble.style.background = char ? charVar(char, 'bg') : '#242c39';
+      bubble.style.color = char ? charVar(char, 'c') : '#e9e4d6';
 
       const meta = document.createElement('div');
       meta.className = 'log-meta';
@@ -2045,7 +2060,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   sysColorInput.addEventListener('input', () => {
     settings.sysColor = sysColorInput.value;
     saveSettings();
-    schedulePreview();
+    applyColorVars(); // 미리보기는 CSS 변수만 갱신 → 드래그 중에도 즉시 반영
   });
   const sysColorHex = linkHexInput(sysColorInput);
   sysColorInput.insertAdjacentElement('afterend', sysColorHex);
