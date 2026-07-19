@@ -43,13 +43,25 @@
       <button id="addCharBtn" class="btn btn-ghost" type="button">+ 캐릭터 추가</button>
     </aside>
     <section class="panel main-panel">
-      <div class="panel-head">
-        <h2>로그 입력</h2>
-        <button id="clearBtn" class="reset-link" type="button">입력 지우기</button>
+      <div class="preview-frame input-frame">
+        <div class="preview-titlebar">
+          <span class="preview-title-label">❯ log input</span>
+          <div class="titlebar-actions">
+            <button id="clearBtn" class="titlebar-danger" type="button">입력 지우기</button>
+            <button id="resetInputSize" type="button">크기 초기화</button>
+          </div>
+        </div>
+        <textarea id="logInput" placeholder="여기에 채팅 로그를 붙여넣으세요 — 붙여넣는 즉시 아래 미리보기로 변환됩니다"></textarea>
       </div>
-      <textarea id="logInput" placeholder="여기에 채팅 로그를 붙여넣으세요 — 붙여넣는 즉시 아래 미리보기로 변환됩니다"></textarea>
 
-      <div class="options-bar">
+      <div id="optionsFold" class="options-fold open">
+        <button id="optionsFoldHead" class="options-fold-head" type="button" aria-expanded="true">
+          <span class="options-fold-title">❯ options</span>
+          <span class="char-chevron">▾</span>
+        </button>
+        <div class="options-fold-body">
+        <div class="options-fold-inner">
+        <div class="options-bar">
         <div class="option-group">
           <div class="option-group-title">표시 옵션</div>
           <div class="option-toggles">
@@ -68,6 +80,10 @@
             <label class="switch-label">
               <input type="checkbox" id="showNameToggle" checked>
               이름(닉네임) 표시
+            </label>
+            <label class="switch-label">
+              <input type="checkbox" id="showAvatarToggle" checked>
+              아바타 표시
             </label>
           </div>
         </div>
@@ -88,12 +104,21 @@
             <p class="char-empty-hint">로그를 붙여넣으면 채널 목록이 나타납니다.</p>
           </div>
         </div>
+        </div>
+        </div>
+        </div>
       </div>
 
       <div class="preview-frame">
         <div class="preview-titlebar">
           <span class="preview-title-label">❯ log preview</span>
-          <button id="resetPreviewSize" type="button">크기 초기화</button>
+          <div class="preview-size-controls">
+            <input type="number" id="previewWidthInput" min="220" title="가로 크기(px)" aria-label="미리보기 가로 크기(px)">
+            <span class="preview-size-sep">×</span>
+            <input type="number" id="previewHeightInput" min="140" title="세로 크기(px)" aria-label="미리보기 세로 크기(px)">
+            <span class="preview-size-sep">px</span>
+            <button id="resetPreviewSize" type="button">크기 초기화</button>
+          </div>
         </div>
         <div id="preview"><p class="empty-notice">로그를 붙여넣으면 자동으로 변환됩니다.</p></div>
         <div class="preview-actions">

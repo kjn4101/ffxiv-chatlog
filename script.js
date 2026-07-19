@@ -962,6 +962,29 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return null;
   }
 
+  // 미등록 캐릭터의 감정표현 줄에서 닉네임 후보 추출 — '발견된 닉네임' 제안용.
+  // 등록된 닉네임은 tryParseEmote가 잡으므로, 여기선 아무 패턴에도 안 걸린 'unknown' 줄만 대상.
+  // 한글 닉네임은 조사와의 경계를 알 수 없어, 오탐 없는 두 패턴만 인식:
+  //   ① 닉네임+서버명(+조사): "○○카벙클은 빤히…" → 서버명 앞까지
+  //   ② 영문·숫자 닉네임+조사: "Rorrim는 무시했다…" → 조사 앞까지
+  function extractEmoteNickCandidate(message) {
+    const m = (message || '').match(/^([A-Za-z0-9가-힣]+)/);
+    if (!m) return '';
+    const token = m[1];
+    // 토큰 뒤는 공백·문장부호·줄 끝이므로, 꼬리가 조사(또는 '님'+조사) 그 자체인지로 판정
+    const isNickTail = (tail) => {
+      if (tail.startsWith('님')) tail = tail.slice(1);
+      return tail === '' || EMOTE_PARTICLES.includes(tail);
+    };
+    for (const s of SERVER_NAMES) {
+      const idx = token.lastIndexOf(s);
+      if (idx > 0 && isNickTail(token.slice(idx + s.length))) return token.slice(0, idx);
+    }
+    const lm = token.match(/^([A-Za-z0-9]+)([가-힣]+)$/);
+    if (lm && isNickTail(lm[2])) return lm[1];
+    return '';
+  }
+
   // 메시지 맨 앞의 등록 닉네임 탐색 (스왑된 감표의 알약 색용)
   function leadingRegisteredNick(text) {
     const t = text || '';
@@ -1092,6 +1115,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   function shouldShowName() {
     return document.getElementById('showNameToggle').checked;
+  }
+
+  function shouldShowAvatar() {
+    return document.getElementById('showAvatarToggle').checked;
   }
 
   function renderChannelFilter(entries) {
@@ -1256,21 +1283,23 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const line = document.createElement('div');
     line.className = 'log-line is-whisper ' + (isOut ? 'whisper-out' : 'whisper-in');
 
-    const avatar = document.createElement('div');
-    avatar.className = 'log-avatar';
-    if (char) {
-      avatar.style.background = charVar(char, 'bg');
-      avatar.style.color = charVar(char, 'c');
-      if (char.avatarType === 'image' && char.avatarValue) {
-        avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
+    if (shouldShowAvatar()) {
+      const avatar = document.createElement('div');
+      avatar.className = 'log-avatar';
+      if (char) {
+        avatar.style.background = charVar(char, 'bg');
+        avatar.style.color = charVar(char, 'c');
+        if (char.avatarType === 'image' && char.avatarValue) {
+          avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
+        } else {
+          avatar.textContent = char.avatarValue || '';
+        }
       } else {
-        avatar.textContent = char.avatarValue || '';
+        avatar.classList.add('log-avatar-default');
+        avatar.textContent = isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?');
       }
-    } else {
-      avatar.classList.add('log-avatar-default');
-      avatar.textContent = isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?');
+      line.appendChild(avatar);
     }
-    line.appendChild(avatar);
 
     const bubble = document.createElement('div');
     bubble.className = 'log-bubble';
@@ -1383,7 +1412,11 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const seen = new Set();
     const unregistered = [];
     (entries || []).forEach(e => {
-      const nick = normalizeNick(e.nickname);
+      let nick = normalizeNick(e.nickname);
+      // 닉네임 없는 미분류 줄은 감표일 수 있음 — 닉네임 후보를 추출해 제안
+      if (!nick && e.channelType === 'unknown') {
+        nick = normalizeNick(extractEmoteNickCandidate(e.message));
+      }
       if (!nick || seen.has(nick)) return;
       seen.add(nick);
       if (!findCharacterByNickname(nick)) unregistered.push(nick);
@@ -1489,21 +1522,23 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const line = document.createElement('div');
       line.className = 'log-line';
 
-      const avatar = document.createElement('div');
-      avatar.className = 'log-avatar';
-      if (char) {
-        avatar.style.background = charVar(char, 'bg');
-        avatar.style.color = charVar(char, 'c');
-        if (char.avatarType === 'image' && char.avatarValue) {
-          avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
+      if (shouldShowAvatar()) {
+        const avatar = document.createElement('div');
+        avatar.className = 'log-avatar';
+        if (char) {
+          avatar.style.background = charVar(char, 'bg');
+          avatar.style.color = charVar(char, 'c');
+          if (char.avatarType === 'image' && char.avatarValue) {
+            avatar.innerHTML = '<img src="' + char.avatarValue + '" alt="">';
+          } else {
+            avatar.textContent = char.avatarValue || '';
+          }
         } else {
-          avatar.textContent = char.avatarValue || '';
+          avatar.classList.add('log-avatar-default');
+          avatar.textContent = (entry.nickname || '?').charAt(0) || '?';
         }
-      } else {
-        avatar.classList.add('log-avatar-default');
-        avatar.textContent = (entry.nickname || '?').charAt(0) || '?';
+        line.appendChild(avatar);
       }
-      line.appendChild(avatar);
 
       const bubble = document.createElement('div');
       bubble.className = 'log-bubble';
@@ -1643,7 +1678,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const headerDiv = headerHtml ? '<div style="font-size:14px;line-height:1.5;">' + headerHtml + '</div>' : '';
     return '<tr>' +
       '<td width="3" style="width:3px;background:' + barColor + ';border:none;padding:0;font-size:1px;line-height:1px;">&nbsp;</td>' +
-      '<td width="46" valign="middle" style="width:46px;border:none;padding:7px 0 7px 6px;text-align:center;">' + avatarHtml + '</td>' +
+      (shouldShowAvatar() ? '<td width="46" valign="middle" style="width:46px;border:none;padding:7px 0 7px 6px;text-align:center;">' + avatarHtml + '</td>' : '') +
       '<td valign="middle" style="border:none;padding:7px 0 7px 10px;' + COPY_FONT + '">' +
         headerDiv +
         '<div style="font-size:14px;line-height:1.55;color:#222;white-space:pre-wrap;' + (italic ? 'font-style:italic;' : '') + '">' + bodyHtml + '</div>' +
@@ -1653,16 +1688,18 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   }
 
   // 가운데 정렬 행 (시스템/감정표현). 시간 표시 시: [빈칸][가운데][시간]으로 좌우 대칭을 맞춰 가운데 유지.
+  // 왼쪽 빈칸의 colspan은 아바타 열 유무에 따라 달라짐
   function copyCenterRow(innerHtml, extraStyle, timeHtml, timeColor) {
+    const leftCols = shouldShowAvatar() ? 2 : 1;
     if (shouldShowTime()) {
       return '<tr>' +
-        '<td colspan="2" style="border:none;padding:0;"></td>' +
+        '<td colspan="' + leftCols + '" style="border:none;padding:0;"></td>' +
         '<td style="border:none;padding:4px 0;text-align:center;' + COPY_FONT + (extraStyle || '') + '">' + innerHtml + '</td>' +
         '<td width="46" valign="top" style="width:46px;border:none;padding:4px 4px 0 4px;text-align:right;font-size:11px;font-family:\'DM Mono\',Consolas,monospace;color:' + (timeColor || '#999') + ';white-space:nowrap;">' + (timeHtml || '') + '</td>' +
       '</tr>';
     }
     return '<tr>' +
-      '<td colspan="3" style="border:none;padding:4px 0;text-align:center;' + COPY_FONT + (extraStyle || '') + '">' + innerHtml + '</td>' +
+      '<td colspan="' + (leftCols + 1) + '" style="border:none;padding:4px 0;text-align:center;' + COPY_FONT + (extraStyle || '') + '">' + innerHtml + '</td>' +
     '</tr>';
   }
 
@@ -1702,7 +1739,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       const header = (shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' : '') +
         (meta ? (shouldShowName() ? ' ' : '') + '<span style="' + metaStyle + '">' + escapeHtml(meta) + '</span>' : '');
       const fallback = isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?');
-      return copyMsgRow(wChar ? wChar.bg : '#cccccc', copyAvatarCellHtml(wChar, fallback), header, messageHtml, true, timeHtml);
+      return copyMsgRow(wChar ? wChar.bg : '#cccccc', shouldShowAvatar() ? copyAvatarCellHtml(wChar, fallback) : '', header, messageHtml, true, timeHtml);
     }
 
     // 일반 대화: 색 줄 + 아바타 + 이름(굵게), 시간은 오른쪽 칸
@@ -1711,7 +1748,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const namePart = shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' : '';
     const channelPart = channelLabel ? '<span style="' + metaStyle + '">' + escapeHtml(channelLabel) + '</span>' : '';
     const header = [namePart, channelPart].filter(Boolean).join(' ');
-    return copyMsgRow(char ? char.bg : '#cccccc', copyAvatarCellHtml(char, (entry.nickname || '?').charAt(0) || '?'), header, messageHtml, false, timeHtml);
+    return copyMsgRow(char ? char.bg : '#cccccc', shouldShowAvatar() ? copyAvatarCellHtml(char, (entry.nickname || '?').charAt(0) || '?') : '', header, messageHtml, false, timeHtml);
   }
 
   /* ---------- HTML 코드 복사용 (티스토리 등 HTML 편집 모드) ----------
@@ -1817,7 +1854,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       if (shouldShowName()) metaParts.push('→ ' + (isOut ? nickToDisplay(entry.recipient) : myDisplayName()));
       if (shouldShowChannel()) metaParts.push('귓속말'); // '귓속말' 라벨은 채널 표시 설정을 따름
       const meta = metaParts.join(' ');
-      const av = richAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?'), 36, 1);
+      const av = shouldShowAvatar() ? richAvatarHtml(wChar, isOut ? '나' : ((entry.nickname || '?').charAt(0) || '?'), 36, 1) : '';
       const header = (shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b> ' : '') +
         (meta ? '<span style="font-size:11px;opacity:0.7;">' + escapeHtml(meta) + '</span>' : '');
       return richRowHtml(av, bg, color, header.trim(), '<span style="font-style:italic;">' + msgHtml + '</span>', true, time);
@@ -1828,7 +1865,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const color = char ? char.color : '#e9e4d6';
     const name = (char && char.displayName) ? char.displayName : (entry.nickname || '???');
     const ch = (entry.channel && shouldShowChannel()) ? ' <span style="font-size:11px;opacity:0.75;">[' + escapeHtml(entry.channel) + ']</span>' : '';
-    const av = richAvatarHtml(char, (entry.nickname || '?').charAt(0) || '?', 36, 1);
+    const av = shouldShowAvatar() ? richAvatarHtml(char, (entry.nickname || '?').charAt(0) || '?', 36, 1) : '';
     const nameHtml = shouldShowName() ? '<b style="font-size:14px;">' + escapeHtml(name) + '</b>' : '';
     const header = (nameHtml + ch).trim();
     return richRowHtml(av, bg, color, header, msgHtml, false, time);
@@ -1884,10 +1921,13 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       return;
     }
 
-    // 표 하나로 묶어 에디터가 빈 줄을 넣지 않게. colgroup으로 칸 폭 고정, 시간 칸은 옵션
-    const colgroup = shouldShowTime()
-      ? '<colgroup><col style="width:3px;"><col style="width:46px;"><col><col style="width:46px;"></colgroup>'
-      : '<colgroup><col style="width:3px;"><col style="width:46px;"><col></colgroup>';
+    // 표 하나로 묶어 에디터가 빈 줄을 넣지 않게. colgroup으로 칸 폭 고정, 아바타·시간 칸은 옵션
+    const colgroup = '<colgroup>' +
+      '<col style="width:3px;">' +
+      (shouldShowAvatar() ? '<col style="width:46px;">' : '') +
+      '<col>' +
+      (shouldShowTime() ? '<col style="width:46px;">' : '') +
+      '</colgroup>';
     const htmlContent = '<table border="0" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:none;width:100%;table-layout:fixed;' + COPY_FONT + '">' +
       colgroup + '<tbody>' +
       filtered.map(buildLineHtml).join('') + '</tbody></table>';
@@ -2032,15 +2072,71 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   document.getElementById('showChannelToggle').addEventListener('change', renderPreview);
   document.getElementById('showTimeToggle').addEventListener('change', renderPreview);
   document.getElementById('showNameToggle').addEventListener('change', renderPreview);
+  document.getElementById('showAvatarToggle').addEventListener('change', renderPreview);
   document.getElementById('copyBtn').addEventListener('click', copyFormatted);
   document.getElementById('htmlCopyBtn').addEventListener('click', copyHtmlCode);
   document.getElementById('textCopyBtn').addEventListener('click', copyPlainText);
   document.getElementById('exportFullBtn').addEventListener('click', () => capturePreview(false, 'exportFullBtn'));
   document.getElementById('exportViewBtn').addEventListener('click', () => capturePreview(true, 'exportViewBtn'));
+  /* 옵션 영역 접기/펼치기 — 캐릭터 행과 같은 카드 접기, 상태는 설정에 기억 */
+  const optionsFold = document.getElementById('optionsFold');
+  const optionsFoldHead = document.getElementById('optionsFoldHead');
+  function setOptionsOpen(open) {
+    optionsFold.classList.toggle('open', open);
+    optionsFoldHead.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+  setOptionsOpen(settings.optionsOpen !== false); // 기본 펼침
+  optionsFoldHead.addEventListener('click', () => {
+    const open = !optionsFold.classList.contains('open');
+    setOptionsOpen(open);
+    settings.optionsOpen = open;
+    saveSettings();
+  });
+
+  /* 미리보기 크기 — px 직접 입력과 모서리 드래그 양방향 동기화 */
+  const previewEl = document.getElementById('preview');
+  const previewWInput = document.getElementById('previewWidthInput');
+  const previewHInput = document.getElementById('previewHeightInput');
+
+  // 현재 실제 크기를 입력칸에 표시. 타이핑 중인 칸은 덮어쓰지 않음
+  function syncPreviewSizeInputs() {
+    const rect = previewEl.getBoundingClientRect();
+    if (document.activeElement !== previewWInput) previewWInput.value = Math.round(rect.width);
+    if (document.activeElement !== previewHInput) previewHInput.value = Math.round(rect.height);
+  }
+
+  previewWInput.addEventListener('input', () => {
+    const v = parseInt(previewWInput.value, 10);
+    if (v > 0) previewEl.style.width = v + 'px';
+  });
+  previewHInput.addEventListener('input', () => {
+    const v = parseInt(previewHInput.value, 10);
+    if (v > 0) previewEl.style.height = v + 'px';
+  });
+  // 입력 확정(Enter·포커스 이동) 시 min·max로 보정된 실제 크기를 다시 표시 (예: 50 입력 → 최소 220)
+  function forceSyncPreviewSizeInputs() {
+    const rect = previewEl.getBoundingClientRect();
+    previewWInput.value = Math.round(rect.width);
+    previewHInput.value = Math.round(rect.height);
+  }
+  previewWInput.addEventListener('change', forceSyncPreviewSizeInputs);
+  previewHInput.addEventListener('change', forceSyncPreviewSizeInputs);
+
+  // 모서리 드래그·창 크기 변화 → 입력칸 갱신
+  new ResizeObserver(syncPreviewSizeInputs).observe(previewEl);
+  syncPreviewSizeInputs();
+
+  // 로그 입력창 크기 초기화 — 드래그로 늘린 높이를 CSS 기본값으로
+  document.getElementById('resetInputSize').addEventListener('click', () => {
+    const t = document.getElementById('logInput');
+    t.style.height = '';
+    t.style.width = '';
+  });
+
   document.getElementById('resetPreviewSize').addEventListener('click', () => {
-    const p = document.getElementById('preview');
-    p.style.width = '';
-    p.style.height = ''; // CSS 기본값(높이 480px, 가로 자동)으로 복귀
+    previewEl.style.width = '';
+    previewEl.style.height = ''; // CSS 기본값(높이 600px, 가로 자동 → 최대 800)으로 복귀
+    syncPreviewSizeInputs();
   });
 
   const logBgColorInput = document.getElementById('logBgColor');

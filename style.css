@@ -16,6 +16,9 @@
     --radius: 12px;
     --radius-btn: 7px;
     --radius-input: 6px;
+    /* 전체 폭 = 사이드 320 + 본문 좌우 여백 56 + 미리보기 테두리 2 + 미리보기 800
+       → 창을 최대로 넓히면 미리보기가 클래식 4:3인 800×600 */
+    --layout-max: 1178px;
     --ease: cubic-bezier(0.4, 0, 0.2, 1);
 
     /* 간격 스케일 — 4pt 기반. */
@@ -66,7 +69,7 @@
   .app-header::after {
     content: '';
     position: absolute;
-    left: max(var(--space-lg), calc(50% - 620px + var(--space-lg)));
+    left: max(var(--space-lg), calc(50% - var(--layout-max) / 2 + var(--space-lg)));
     bottom: -1px;
     height: 1px;
     width: 220px;
@@ -74,7 +77,7 @@
   }
 
   .header-inner {
-    max-width: 1240px;
+    max-width: var(--layout-max);
     margin: 0 auto;
     padding: 13px var(--space-lg);
     display: flex;
@@ -135,7 +138,7 @@
   .layout {
     flex: 1;
     width: 100%;
-    max-width: 1240px;
+    max-width: var(--layout-max);
     margin: 0 auto;
     display: grid;
     grid-template-columns: 320px 1fr;
@@ -785,22 +788,44 @@
 
   textarea#logInput::placeholder { color: var(--text-secondary); font-family: var(--font-sans); }
 
+  /* 로그 입력 카드 — 미리보기와 같은 "❯" 타이틀바 프레임으로 통일 */
+  .input-frame { margin-top: 0; }
+
+  .input-frame textarea#logInput {
+    display: block;
+    border: none;
+    border-radius: 0;
+  }
+
+  /* 테두리가 없어진 대신 포커스는 카드 테두리로 표시 (그림자 링은 overflow에 잘림) */
+  .input-frame:focus-within { border-color: var(--cyan); }
+  .input-frame textarea#logInput:focus-visible { box-shadow: none; }
+
+  .titlebar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* 파괴적 행동(입력 지우기)은 hover를 장미색으로 */
+  .preview-titlebar button.titlebar-danger:hover { border-color: var(--danger); color: var(--danger); }
+
   /* ---------- 표시 옵션 바 — 미리보기를 조절하는 모든 것을 한 곳에 ----------
-     표시 옵션 | 색상이 정확히 절반씩 나뉘고, 채널 필터는 아래 풀폭 행. */
-  .options-bar {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--space-md) var(--space-lg);
+     표시 옵션 | 색상이 정확히 절반씩 나뉘고, 채널 필터는 아래 풀폭 행.
+     카드 전체가 캐릭터 행처럼 머리줄 클릭으로 접힘 (상태는 localStorage에 기억) */
+  .options-fold {
     margin-top: var(--space-md);
-    padding: var(--space-md) 18px;
     background: linear-gradient(180deg, var(--panel) 0%, #131825 100%);
     border: 1px solid var(--border-soft);
     border-radius: var(--radius);
     position: relative;
+    transition: border-color 0.2s var(--ease);
   }
 
+  .options-fold:hover { border-color: var(--border-glow); }
+
   /* 패널 상단의 가느다란 황금 강조선 */
-  .options-bar::before {
+  .options-fold::before {
     content: '';
     position: absolute;
     top: 0;
@@ -808,6 +833,64 @@
     right: 18px;
     height: 1px;
     background: linear-gradient(90deg, transparent, var(--border-glow) 30%, var(--border-glow) 70%, transparent);
+  }
+
+  /* 머리줄 — 접힌 상태에서 보이는 전부.
+     미리보기 카드의 "❯ log preview" 타이틀바와 같은 모노 스타일 → 내부 그룹 제목(금색 한글)과 구별 */
+  .options-fold-head {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    background: none;
+    border: none;
+    padding: 9px 14px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .options-fold.open .options-fold-head { border-bottom: 1px solid var(--border-soft); }
+
+  .options-fold-head:focus-visible {
+    outline: 2px solid var(--cyan);
+    outline-offset: -2px;
+  }
+
+  .options-fold-title {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--gold);
+    letter-spacing: 0.2px;
+    user-select: none;
+  }
+
+  .options-fold.open .char-chevron { transform: rotate(180deg); }
+
+  /* 본문 접기/펼치기 — 캐릭터 행과 같은 grid 0fr→1fr 트릭 */
+  .options-fold-body {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.22s var(--ease);
+  }
+
+  .options-fold-inner {
+    overflow: hidden;
+    min-height: 0;
+    visibility: hidden; /* 접힌 동안엔 키보드 포커스도 닿지 않게 */
+    transition: visibility 0.22s;
+  }
+
+  .options-fold.open .options-fold-body { grid-template-rows: 1fr; }
+  .options-fold.open .options-fold-inner { visibility: visible; }
+
+  .options-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-md) var(--space-lg);
+    padding: var(--space-md) 18px;
   }
 
   .option-group {
@@ -852,11 +935,15 @@
     letter-spacing: 0.2px;
   }
 
-  /* 토글 4개를 2×2로 촘촘하게 */
+  /* 토글 5개를 3+2 두 줄로 촘촘하게. 좁은 화면에선 2열로 (라벨 줄바꿈 방지) */
   .option-toggles {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, max-content));
+    grid-template-columns: repeat(3, minmax(0, max-content));
     gap: 8px 18px;
+  }
+
+  @media (max-width: 1000px) {
+    .option-toggles { grid-template-columns: repeat(2, minmax(0, max-content)); }
   }
 
   .switch-label {
@@ -976,6 +1063,7 @@
 
   .preview-titlebar {
     display: flex;
+    flex-wrap: wrap; /* 좁은 화면에서 크기 입력칸이 다음 줄로 */
     align-items: center;
     justify-content: space-between;
     gap: var(--space-sm);
@@ -1006,11 +1094,49 @@
 
   .preview-titlebar button:hover { border-color: var(--cyan); color: var(--cyan); }
 
+  /* 가로×세로 px 직접 입력 — 모서리 드래그와 양방향 동기화 */
+  .preview-size-controls {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .preview-size-controls input[type="number"] {
+    width: 58px;
+    background: var(--inset);
+    border: 1px solid var(--border-soft);
+    border-radius: 5px;
+    padding: 3px 6px;
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    text-align: right;
+  }
+
+  .preview-size-controls input[type="number"]:focus { color: var(--text-primary); }
+
+  /* 업다운(스피너) 버튼 숨김 — 타이핑 입력만 */
+  .preview-size-controls input[type="number"]::-webkit-outer-spin-button,
+  .preview-size-controls input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  .preview-size-controls input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+  .preview-size-sep {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    color: var(--text-secondary);
+    user-select: none;
+  }
+
+  .preview-size-controls button { margin-left: 5px; }
+
   #preview {
     display: flex;
     flex-direction: column;
     gap: 13px;
-    height: 480px;
+    height: 600px; /* 기본 800×600 (4:3) — 가로는 레이아웃 최대 폭에서 유도 */
     min-height: 140px;
     min-width: 220px;
     max-width: 100%;
