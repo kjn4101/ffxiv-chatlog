@@ -412,8 +412,10 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     if (!narrowToLog || logText.trim() === '') return characters;
     const present = computePresentCharIds(logText);
     // 등장 캐릭터 + 이번 세션에 추가한 캐릭터 + 닉네임이 비어있는(작성 중) 캐릭터
+    // + 숨긴 캐릭터(로그에 없어도 '숨긴 캐릭터' 접이식 섹션에서 다시 켤 수 있어야 함)
     return characters.filter(c =>
-      present.has(c.id) || pinnedIds.has(c.id) || normalizeNick(c.nickname) === '');
+      present.has(c.id) || pinnedIds.has(c.id) || hiddenOutputIds.has(c.id) ||
+      normalizeNick(c.nickname) === '');
   }
 
   /* ---------- 캐릭터 CRUD ---------- */
@@ -1363,6 +1365,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       swapOverrides.set(entry.raw, toEmote ? 'emote' : 'system');
+      // 옮겨간 채널이 필터에서 꺼져 있으면 줄이 바로 사라지므로 켜줌
+      // ('시스템/기타'는 기본 꺼짐이라 감표→시스템이 특히 그랬음)
+      channelFilterState[toEmote ? '감정표현' : '시스템/기타'] = true;
       renderPreview();
     });
     lineNode.classList.add('has-swap');
