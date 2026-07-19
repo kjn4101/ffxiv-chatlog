@@ -1526,8 +1526,15 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     const ta = document.createElement('textarea');
     const src = getInputLines();
     ta.value = entry.lines.map(i => src[i] !== undefined ? src[i] : '').join('\n');
-    ta.rows = Math.min(8, ta.value.split('\n').length); // 내용 줄 수만큼 (한 줄이면 한 줄 크기)
+    ta.rows = 1;
     ta.spellcheck = false;
+
+    // 내용에 맞춰 높이 자동 조절 (최대 높이는 CSS에서 제한)
+    const autoGrow = () => {
+      ta.style.height = 'auto';
+      ta.style.height = (ta.scrollHeight + 2) + 'px'; // +2 = 위아래 테두리
+    };
+    ta.addEventListener('input', autoGrow);
 
     const apply = () => {
       editingLineIdx = null;
@@ -1566,8 +1573,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     box.appendChild(ta);
     box.appendChild(row);
 
-    // 렌더 직후 포커스, 커서는 끝으로
+    // 렌더 직후 높이 맞추고 포커스, 커서는 끝으로
     requestAnimationFrame(() => {
+      autoGrow();
       ta.focus();
       ta.setSelectionRange(ta.value.length, ta.value.length);
     });

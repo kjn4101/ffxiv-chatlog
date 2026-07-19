@@ -1524,7 +1524,9 @@
 
   .log-edit-box textarea {
     width: 100%;
-    resize: vertical;
+    resize: none; /* 높이는 내용에 맞춰 자동 조절 */
+    overflow-y: auto;
+    max-height: 240px; /* 그 이상은 스크롤 */
     padding: 6px 8px;
     font-family: var(--font-mono);
     font-size: 12.5px;
@@ -1558,12 +1560,12 @@
   }
 
   .log-edit-cancel {
-    color: var(--text-secondary);
+    color: var(--danger);
     background: transparent;
-    border: 1px solid var(--border-soft);
+    border: 1px solid rgba(208, 122, 122, 0.45);
   }
 
-  .log-edit-cancel:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+  .log-edit-cancel:hover { color: #e09c9c; border-color: var(--danger); }
 
   .log-edit-hint {
     margin-right: auto;
