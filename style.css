@@ -745,6 +745,15 @@
   }
   .btn-outline:hover { border-color: var(--cyan); color: var(--cyan); }
 
+  .btn-danger {
+    border: 1px solid var(--danger);
+    background: var(--danger);
+    color: #141a26;
+    font-weight: 700;
+  }
+
+  .btn-danger:hover { filter: brightness(1.08); }
+
   .btn-ghost {
     background: transparent;
     border: 1px dashed var(--border-soft);
@@ -1446,7 +1455,7 @@
 
   .log-swap-btn {
     position: absolute;
-    top: 2px;
+    bottom: 10px;
     left: 4px;
     z-index: 2;
     padding: 1px 7px;
@@ -1458,11 +1467,109 @@
     border-radius: 5px;
     cursor: pointer;
     opacity: 0;
+    pointer-events: none; /* 숨김 상태에서 클릭을 가로채지 않게 */
     transition: opacity 0.12s ease;
   }
 
-  .log-line.has-swap:hover .log-swap-btn { opacity: 0.85; }
+  .log-line.has-swap:hover .log-swap-btn {
+    opacity: 0.85;
+    pointer-events: auto;
+  }
   .log-swap-btn:hover { opacity: 1; color: var(--cyan); }
+
+  /* 줄 수정·지우기 버튼 — hover 시 줄 안 오른쪽 아래에 표시 (미리보기 전용) */
+  .log-line.has-actions { position: relative; }
+
+  .log-line-actions {
+    position: absolute;
+    bottom: 10px;
+    right: 4px;
+    z-index: 2;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    pointer-events: none; /* 숨김 상태에서 클릭을 가로채지 않게 */
+    transition: opacity 0.12s ease;
+  }
+
+  .log-line.has-actions:hover .log-line-actions {
+    opacity: 0.85;
+    pointer-events: auto;
+  }
+
+  .log-line-actions button {
+    padding: 1px 7px;
+    font-size: var(--text-2xs);
+    line-height: 1.5;
+    color: var(--text-secondary);
+    background: rgba(20, 26, 38, 0.92);
+    border: 1px solid var(--border-soft);
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .log-line-actions .log-edit-btn:hover { color: var(--cyan); }
+  .log-line-actions .log-del-btn:hover { color: var(--danger); }
+
+  /* 줄 편집 상자 — 수정 중인 줄 자리에 표시 */
+  .log-edit-box {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px;
+    border: 1px dashed var(--cyan);
+    border-radius: 10px;
+    background: rgba(20, 26, 38, 0.6);
+  }
+
+  .log-edit-box textarea {
+    width: 100%;
+    resize: vertical;
+    padding: 6px 8px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-primary);
+    background: var(--panel-raised);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+  }
+
+  .log-edit-box textarea:focus { outline: none; border-color: var(--cyan); }
+
+  .log-edit-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .log-edit-actions button {
+    padding: 2px 10px;
+    font-size: var(--text-2xs);
+    border-radius: 5px;
+    cursor: pointer;
+  }
+
+  .log-edit-apply {
+    color: #10151d;
+    background: var(--cyan);
+    border: 1px solid var(--cyan);
+    font-weight: 700;
+  }
+
+  .log-edit-cancel {
+    color: var(--text-secondary);
+    background: transparent;
+    border: 1px solid var(--border-soft);
+  }
+
+  .log-edit-cancel:hover { color: var(--text-primary); border-color: var(--text-secondary); }
+
+  .log-edit-hint {
+    margin-left: auto;
+    font-size: var(--text-2xs);
+    color: var(--text-secondary);
+  }
 
   /* ---------- 사진 크롭 편집기 ---------- */
   .crop-overlay {
@@ -1542,6 +1649,30 @@
   }
 
   .crop-btns .btn { flex: 1; }
+
+  /* ---------- 확인창 (confirm 대체) ---------- */
+  .confirm-msg {
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    text-align: center;
+    margin-bottom: 14px;
+  }
+
+  /* 지워질 줄 미리보기 — 한 줄로 말줄임 */
+  .confirm-detail {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    color: var(--text-secondary);
+    background: var(--panel-raised);
+    border: 1px solid var(--border-soft);
+    border-radius: 6px;
+    padding: 6px 9px;
+    margin: -6px 0 14px;
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   /* ---------- 푸터 ---------- */
   .app-footer {

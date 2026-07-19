@@ -694,10 +694,12 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       clearPhotoBtn.addEventListener('click', () => {
         // 사진 없으면 무시
         if (c.avatarType !== 'image' || !c.avatarValue) return;
-        if (!confirm('이 캐릭터의 프로필 사진을 지울까요?')) return;
-        updateCharacter(c.id, { avatarType: 'emoji', avatarValue: c.emojiText || '', avatarThumb: '' });
-        refreshAvatarPreview();
-        renderPreview();
+        showConfirm('이 캐릭터의 프로필 사진을 지울까요?', '', '지우기').then(ok => {
+          if (!ok) return;
+          updateCharacter(c.id, { avatarType: 'emoji', avatarValue: c.emojiText || '', avatarThumb: '' });
+          refreshAvatarPreview();
+          renderPreview();
+        });
       });
 
       // ----- 필드 그리드: [라벨 | 컨트롤] 줄 정렬 -----
@@ -826,9 +828,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       removeBtn.textContent = '삭제';
       removeBtn.addEventListener('click', () => {
         const label = c.displayName || c.nickname || '이 캐릭터';
-        if (confirm('‘' + label + '’ 캐릭터 설정을 삭제할까요? 되돌릴 수 없습니다.')) {
-          removeCharacter(c.id);
-        }
+        showConfirm('‘' + label + '’ 캐릭터 설정을 삭제할까요? 되돌릴 수 없습니다.', '', '삭제')
+          .then(ok => { if (ok) removeCharacter(c.id); });
       });
       foot.appendChild(removeBtn);
       fields.appendChild(foot);
@@ -1047,7 +1048,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     // 시간 표기가 아예 없는 로그에서는 이 규칙을 꺼서 시스템 줄이 흡수되지 않게 함.
     const anyTimed = lines.some(l => TIME_RE.test(l));
     const entries = [];
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
       if (line.trim() === '') continue;
 
       let time = '';
@@ -1060,7 +1062,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
       const emoteResult = tryParseEmote(rest);
       if (emoteResult) {
-        entries.push(Object.assign({ time, raw: line }, emoteResult));
+        entries.push(Object.assign({ time, raw: line, lines: [i] }, emoteResult));
         continue;
       }
 
@@ -1069,8 +1071,9 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       // [HH:MM]도 채널/닉네임 패턴도 없는 줄은 직전 메시지에 줄바꿈으로 연결
       if (parsed.unparsed && !timeMatch && anyTimed && entries.length > 0) {
         entries[entries.length - 1].message += '\n' + line;
+        entries[entries.length - 1].lines.push(i); // 이어붙은 줄도 함께 수정·삭제되도록 기록
       } else {
-        entries.push(Object.assign({ time, raw: line }, parsed));
+        entries.push(Object.assign({ time, raw: line, lines: [i] }, parsed));
       }
     }
     // 감표↔시스템 수동 전환 반영
@@ -1250,7 +1253,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   }
 
   // 말풍선 내용 채우기:
-  // - 메타(이름·채널) 있으면 메타 줄 + 메시지
+  // - 메타(이름·채널) 있으면 메타 줄 끝에 시간, 그 아래 메시지
   // - 메타 없고 시간만 있으면 메시지·시간 한 줄
   // - 둘 다 없으면 메시지만
   function fillBubble(bubble, meta, msg, timeText) {
@@ -1403,6 +1406,174 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     lineNode.appendChild(btn);
   }
 
+  // confirm() 대체 확인창 — 확인 시 true (크롭 편집기와 같은 오버레이)
+  function showConfirm(message, detail, confirmLabel) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'crop-overlay';
+      const box = document.createElement('div');
+      box.className = 'crop-box confirm-box';
+
+      const msg = document.createElement('p');
+      msg.className = 'confirm-msg';
+      msg.textContent = message;
+      box.appendChild(msg);
+
+      if (detail) {
+        const d = document.createElement('p');
+        d.className = 'confirm-detail';
+        d.textContent = detail;
+        box.appendChild(d);
+      }
+
+      const btns = document.createElement('div');
+      btns.className = 'crop-btns';
+      const cancelBtn = document.createElement('button');
+      cancelBtn.type = 'button';
+      cancelBtn.className = 'btn btn-outline';
+      cancelBtn.textContent = '취소';
+      const okBtn = document.createElement('button');
+      okBtn.type = 'button';
+      okBtn.className = 'btn btn-danger';
+      okBtn.textContent = confirmLabel || '확인';
+      btns.appendChild(okBtn);
+      btns.appendChild(cancelBtn);
+      box.appendChild(btns);
+
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      const close = (result) => {
+        document.removeEventListener('keydown', onKey, true);
+        overlay.remove();
+        resolve(result);
+      };
+      const onKey = (e) => {
+        if (e.key === 'Escape') { e.preventDefault(); close(false); }
+        else if (e.key === 'Enter') { e.preventDefault(); close(true); }
+      };
+      document.addEventListener('keydown', onKey, true);
+      cancelBtn.addEventListener('click', () => close(false));
+      okBtn.addEventListener('click', () => close(true));
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(false); });
+      okBtn.focus();
+    });
+  }
+
+  /* ---------- 미리보기에서 줄 수정·지우기 ----------
+     entry.lines(인풋의 줄 번호)로 원본 줄을 직접 고치거나 지움. 클릭은 #preview에 위임 */
+  let editingLineIdx = null; // 수정 중인 줄(entry.lines[0]) — 한 번에 하나만
+
+  function getInputLines() {
+    return document.getElementById('logInput').value.split(/\r?\n/);
+  }
+
+  // lineIdxs의 첫 줄을 newText로 바꾸고 나머지는 제거. newText가 null이면 모두 제거(지우기)
+  function replaceInputLines(lineIdxs, newText) {
+    const idxSet = new Set(lineIdxs);
+    const first = lineIdxs[0];
+    const out = [];
+    getInputLines().forEach((l, i) => {
+      if (i === first) {
+        if (newText !== null) out.push(...newText.split(/\r?\n/));
+      } else if (!idxSet.has(i)) {
+        out.push(l);
+      }
+    });
+    document.getElementById('logInput').value = out.join('\n');
+    renderPreview();
+    renderCharList(); // 닉네임이 바뀌었을 수 있어 등장 캐릭터 목록도 갱신
+  }
+
+  // hover 시 나타나는 [수정][지우기] 버튼 — 내보내기에는 미포함(미리보기 전용 DOM)
+  function addLineActions(lineNode, entry) {
+    if (!entry.lines || entry.lines.length === 0) return;
+    lineNode.dataset.lines = entry.lines.join(',');
+    const wrap = document.createElement('div');
+    wrap.className = 'log-line-actions';
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'log-edit-btn';
+    editBtn.textContent = '수정';
+    editBtn.title = '이 줄의 원본 로그 수정하기 (더블클릭도 가능)';
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'log-del-btn';
+    delBtn.textContent = '지우기';
+    delBtn.title = '이 줄을 로그 입력에서 지우기';
+    wrap.appendChild(editBtn);
+    wrap.appendChild(delBtn);
+    lineNode.classList.add('has-actions');
+    lineNode.appendChild(wrap);
+  }
+
+  function lineIdxsFromNode(node) {
+    const lineEl = node && node.closest('.log-line');
+    if (!lineEl || !lineEl.dataset.lines) return null;
+    return lineEl.dataset.lines.split(',').map(Number);
+  }
+
+  function openLineEditor(lineIdxs) {
+    editingLineIdx = lineIdxs[0];
+    renderPreview();
+  }
+
+  // 수정 중인 줄 자리에 나타나는 편집 상자
+  function buildEditBoxNode(entry) {
+    const box = document.createElement('div');
+    box.className = 'log-edit-box';
+
+    const ta = document.createElement('textarea');
+    const src = getInputLines();
+    ta.value = entry.lines.map(i => src[i] !== undefined ? src[i] : '').join('\n');
+    ta.rows = Math.min(8, ta.value.split('\n').length); // 내용 줄 수만큼 (한 줄이면 한 줄 크기)
+    ta.spellcheck = false;
+
+    const apply = () => {
+      editingLineIdx = null;
+      const v = ta.value;
+      replaceInputLines(entry.lines, v.trim() === '' ? null : v); // 비우고 적용하면 삭제와 동일
+    };
+    const cancel = () => {
+      editingLineIdx = null;
+      renderPreview();
+    };
+
+    ta.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); apply(); }
+      else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    });
+
+    const row = document.createElement('div');
+    row.className = 'log-edit-actions';
+    const applyBtn = document.createElement('button');
+    applyBtn.type = 'button';
+    applyBtn.className = 'log-edit-apply';
+    applyBtn.textContent = '적용';
+    applyBtn.addEventListener('click', apply);
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.className = 'log-edit-cancel';
+    cancelBtn.textContent = '취소';
+    cancelBtn.addEventListener('click', cancel);
+    const hint = document.createElement('span');
+    hint.className = 'log-edit-hint';
+    hint.textContent = '로그 입력에도 반영돼요 · Enter 적용 · Shift+Enter 줄바꿈 · Esc 취소';
+    row.appendChild(applyBtn);
+    row.appendChild(cancelBtn);
+    row.appendChild(hint);
+
+    box.appendChild(ta);
+    box.appendChild(row);
+
+    // 렌더 직후 포커스, 커서는 끝으로
+    requestAnimationFrame(() => {
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    });
+    return box;
+  }
+
   // 미등록 닉네임 칩 — 클릭 한 번으로 등록
   const FOUND_NICKS_MAX = 15;
   function renderFoundNicks(entries) {
@@ -1497,24 +1668,34 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     preview.innerHTML = '';
 
     filtered.forEach(entry => {
+      // 수정 중인 줄은 편집 상자로 교체
+      if (entry.lines && entry.lines[0] === editingLineIdx) {
+        preview.appendChild(buildEditBoxNode(entry));
+        return;
+      }
+
       const char = findCharacterByNickname(entry.nickname);
       const isEmote = entry.channelType === 'emote';
       // 감표 먼저 판정, 그 외 닉네임 없는 줄은 시스템
       const isSystem = !isEmote && !entry.nickname;
 
       if (entry.channelType === 'whisper-out' || entry.channelType === 'whisper-in') {
-        preview.appendChild(buildWhisperNode(entry));
+        const node = buildWhisperNode(entry);
+        addLineActions(node, entry);
+        preview.appendChild(node);
         return;
       }
       if (isEmote) {
         const node = buildEmoteLineNode(entry, char);
         addSwapButton(node, entry);
+        addLineActions(node, entry);
         preview.appendChild(node);
         return;
       }
       if (isSystem) {
         const node = buildSystemLineNode(entry);
         addSwapButton(node, entry);
+        addLineActions(node, entry);
         preview.appendChild(node);
         return;
       }
@@ -1569,6 +1750,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       fillBubble(bubble, meta, msg, (entry.time && shouldShowTime()) ? entry.time : '');
 
       line.appendChild(bubble);
+      addLineActions(line, entry);
       preview.appendChild(line);
     });
 
@@ -1622,7 +1804,8 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     html2canvas(node, {
       backgroundColor: settings.bgColor,
       scale,
-      ignoreElements: el => el.classList && el.classList.contains('log-swap-btn')
+      ignoreElements: el => el.classList && (el.classList.contains('log-swap-btn') ||
+        el.classList.contains('log-line-actions') || el.classList.contains('log-edit-box'))
     }).then(full => {
       restore();
       let out = full;
@@ -1755,11 +1938,6 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
      티스토리·블로그 HTML 모드나 웹페이지는 진짜 브라우저로 렌더링하므로, 미리보기 모습
      (둥근 말풍선·아바타 원·귓속말 반투명·감정표현 알약)을 그대로 인라인 스타일로 재현해요. */
 
-  // 시간 span — 미리보기(.log-time)와 동일한 모노스페이스
-  function richTimeHtml(time) {
-    if (!time) return '';
-    return '<span style="margin-left:auto;font-size:10.5px;opacity:0.6;font-family:\'DM Mono\',monospace;white-space:nowrap;">' + escapeHtml(time) + '</span>';
-  }
 
   function richAvatarHtml(char, fallback, size, opacity) {
     const op = (opacity != null && opacity < 1) ? 'opacity:' + opacity + ';' : '';
@@ -1779,13 +1957,16 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       ? 'border:1px solid rgba(255,255,255,0.14);'
       : 'border:1px solid rgba(255,255,255,0.06);box-shadow:0 2px 10px rgba(0,0,0,0.26);';
     const msgStyle = 'font-size:14px;line-height:1.55;word-break:break-word;white-space:pre-wrap;';
+    const timeSpan = time
+      ? '<span style="margin-left:auto;font-size:10.5px;opacity:0.6;font-family:\'DM Mono\',monospace;white-space:nowrap;">' + escapeHtml(time) + '</span>'
+      : '';
     // 미리보기(fillBubble)와 같은 규칙:
     // - 메타(이름·채널)가 있으면: 메타 줄(+시간 오른쪽 끝) 위, 메시지 아래
-    // - 메타가 없고 시간만 있으면: 메시지·시간을 한 줄에 (말풍선이 세로로 얇아져요)
+    // - 메타가 없고 시간만 있으면: 메시지·시간을 한 줄에
     // - 아무것도 없으면: 메시지만
     let content;
     if (header) {
-      content = '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' + header + richTimeHtml(time) + '</div>' +
+      content = '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:4px;">' + header + timeSpan + '</div>' +
         '<div style="' + msgStyle + '">' + body + '</div>';
     } else if (time) {
       content = '<div style="display:flex;align-items:center;gap:8px;">' +
@@ -2095,6 +2276,26 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   /* 미리보기 크기 — px 직접 입력과 모서리 드래그 양방향 동기화 */
   const previewEl = document.getElementById('preview');
+
+  // 줄 수정·지우기 — 버튼 클릭(위임) 또는 줄 더블클릭으로 편집
+  previewEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('.log-edit-btn, .log-del-btn');
+    if (!btn) return;
+    const idxs = lineIdxsFromNode(btn);
+    if (!idxs) return;
+    if (btn.classList.contains('log-del-btn')) {
+      const snippet = (getInputLines()[idxs[0]] || '').trim();
+      const label = snippet.length > 30 ? snippet.slice(0, 30) + '…' : snippet;
+      showConfirm('이 줄을 삭제할까요? 되돌릴 수 없습니다.', label, '삭제')
+        .then(ok => { if (ok) replaceInputLines(idxs, null); });
+    } else {
+      openLineEditor(idxs);
+    }
+  });
+  previewEl.addEventListener('dblclick', (e) => {
+    const idxs = lineIdxsFromNode(e.target);
+    if (idxs) openLineEditor(idxs);
+  });
   const previewWInput = document.getElementById('previewWidthInput');
   const previewHInput = document.getElementById('previewHeightInput');
 
@@ -2213,23 +2414,27 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
 
   document.getElementById('clearBtn').addEventListener('click', () => {
     document.getElementById('logInput').value = '';
+    editingLineIdx = null;
     renderPreview();
     renderCharList(); // 로그가 비면 편집 목록은 전체 표시로
   });
 
   document.getElementById('resetBtn').addEventListener('click', () => {
-    if (confirm('등록된 모든 캐릭터 설정을 삭제할까요? 되돌릴 수 없습니다.')) {
-      characters = [];
-      pinnedIds.clear();
-      hiddenOutputIds.clear();
-      saveCharacters();
-      renderCharList();
-      renderPreview();
-    }
+    showConfirm('등록된 모든 캐릭터 설정을 삭제할까요? 되돌릴 수 없습니다.', '', '초기화')
+      .then(ok => {
+        if (!ok) return;
+        characters = [];
+        pinnedIds.clear();
+        hiddenOutputIds.clear();
+        saveCharacters();
+        renderCharList();
+        renderPreview();
+      });
   });
 
   let debounceTimer;
   document.getElementById('logInput').addEventListener('input', () => {
+    editingLineIdx = null; // 인풋을 직접 고치면 줄 번호가 어긋나므로 편집 상자 닫음
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(() => {
       renderPreview();
