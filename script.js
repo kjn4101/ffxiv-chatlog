@@ -449,11 +449,26 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     renderPreview();
   }
 
+  // 저장 디바운스 — 색상 드래그·타이핑 중 매 이벤트마다 전체 직렬화(아바타 사진 포함)를 막음.
+  // 떠나기 직전엔 예약된 저장을 즉시 실행해 유실 방지.
+  let saveDebounce;
+  function scheduleSave() {
+    clearTimeout(saveDebounce);
+    saveDebounce = setTimeout(() => { saveDebounce = undefined; saveCharacters(); }, 250);
+  }
+  window.addEventListener('pagehide', () => {
+    if (saveDebounce !== undefined) {
+      clearTimeout(saveDebounce);
+      saveDebounce = undefined;
+      saveCharacters();
+    }
+  });
+
   function updateCharacter(id, patch) {
     const c = characters.find(c => c.id === id);
     if (!c) return;
     Object.assign(c, patch);
-    saveCharacters();
+    scheduleSave();
   }
 
   /* ---------- 캐릭터 순서 바꾸기 ---------- */
@@ -643,7 +658,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         }
         updateCharacter(c.id, patch);
         refreshAvatarPreview();
-        renderPreview();
+        schedulePreview();
       });
 
       const uploadLabel = document.createElement('label');
@@ -730,7 +745,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         updateCharacter(c.id, { nickname: nickInput.value });
         refreshName(); // 머리줄 이름도 실시간 갱신
         refreshSample();
-        renderPreview();
+        schedulePreview();
       });
 
       const dispInput = document.createElement('input');
@@ -742,7 +757,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         updateCharacter(c.id, { displayName: dispInput.value });
         refreshName(); // 머리줄 이름도 실시간 갱신
         refreshSample();
-        renderPreview();
+        schedulePreview();
       });
 
       const bgInput = document.createElement('input');
@@ -753,7 +768,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         updateCharacter(c.id, { bg: bgInput.value });
         avatarPreview.style.background = bgInput.value;
         refreshSample();
-        renderPreview();
+        schedulePreview();
       });
 
       const colorInput = document.createElement('input');
@@ -764,7 +779,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
         updateCharacter(c.id, { color: colorInput.value });
         avatarPreview.style.color = colorInput.value;
         refreshSample();
-        renderPreview();
+        schedulePreview();
       });
 
       // '내 캐릭터' 지정 — 보낸 귓속말의 화자. 한 명만 가능
@@ -1412,6 +1427,14 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
     return '남은 줄이 캐릭터의 ‘출력’ 체크 해제로 모두 숨겨져 있습니다. 캐릭터 행 오른쪽의 출력 체크를 확인해주세요.';
   }
 
+  // 색상 피커 드래그·타이핑처럼 연속 발생하는 입력용 — 입력이 잦아든 뒤 한 번만 재생성.
+  // 매 이벤트마다 로그 전체를 다시 그리면 긴 로그에서 드래그가 버벅임.
+  let previewDebounce;
+  function schedulePreview() {
+    clearTimeout(previewDebounce);
+    previewDebounce = setTimeout(renderPreview, 120);
+  }
+
   function renderPreview() {
     const text = document.getElementById('logInput').value;
     const filtered = getFilteredEntries(text);
@@ -2022,7 +2045,7 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
   sysColorInput.addEventListener('input', () => {
     settings.sysColor = sysColorInput.value;
     saveSettings();
-    renderPreview();
+    schedulePreview();
   });
   const sysColorHex = linkHexInput(sysColorInput);
   sysColorInput.insertAdjacentElement('afterend', sysColorHex);
