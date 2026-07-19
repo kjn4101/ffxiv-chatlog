@@ -909,25 +909,34 @@ const STORAGE_KEY = 'ffxiv_echo_log_characters';
       .sort((a, b) => b.nick.length - a.nick.length);
     for (const c of sorted) {
       if (!rest.startsWith(c.nick)) continue;
-      const after = rest.slice(c.nick.length);
+      let after = rest.slice(c.nick.length);
+      // 로그엔 닉네임 뒤에 서버명이 붙어 나옴("○○카벙클은 …") → 건너뛰고 판정, 표시에서도 제거
+      let body = rest;
+      for (const s of SERVER_NAMES) {
+        if (after.startsWith(s)) {
+          after = after.slice(s.length);
+          body = c.nick + after;
+          break;
+        }
+      }
       if (after === '' || after[0] === ':' || after[0] === '：') continue; // 닉네임만/대사 → 감표 아님
       // "○○ 님이 …"(공백+님) → 시스템 로그, 감표 아님
       if (/^\s+님/.test(after)) continue;
       // "○○님 …"(붙은 님) → 사용자 표현, 감표
       if (after.startsWith('님')) {
-        return { channelType: 'emote', channel: '감정표현', nickname: c.nick, message: rest };
+        return { channelType: 'emote', channel: '감정표현', nickname: c.nick, message: body };
       }
 
       // 1) 닉네임 바로 뒤가 공백·문장부호 → 사용자 지정 감표("○○ 웃는다", "○○. ---한다")
       if (EMOTE_BOUNDARY.test(after)) {
-        return { channelType: 'emote', channel: '감정표현', nickname: c.nick, message: rest };
+        return { channelType: 'emote', channel: '감정표현', nickname: c.nick, message: body };
       }
       // 2) 닉네임 뒤에 한글 조사 + 경계(공백·문장부호·줄 끝) → 기본 감표("○○이 인사한다")
       for (const p of EMOTE_PARTICLES) {
         if (after.startsWith(p)) {
           const tail = after.slice(p.length);
           if (tail === '' || EMOTE_BOUNDARY.test(tail)) {
-            return { channelType: 'emote', channel: '감정표현', nickname: c.nick, message: rest };
+            return { channelType: 'emote', channel: '감정표현', nickname: c.nick, message: body };
           }
         }
       }
