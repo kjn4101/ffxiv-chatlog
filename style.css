@@ -801,6 +801,13 @@
   .input-frame:focus-within { border-color: var(--cyan); }
   .input-frame textarea#logInput:focus-visible { box-shadow: none; }
 
+  /* 스크롤바·크기조절 핸들 — 미리보기와 동일한 다크 스타일 */
+  textarea#logInput { scrollbar-color: var(--border-soft) transparent; }
+  textarea#logInput::-webkit-scrollbar { width: 8px; }
+  textarea#logInput::-webkit-scrollbar-track { background: transparent; }
+  textarea#logInput::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 4px; }
+  textarea#logInput::-webkit-scrollbar-thumb:hover { background: var(--gold-deep); }
+
   .titlebar-actions {
     display: flex;
     align-items: center;
@@ -1143,12 +1150,23 @@
     overflow: auto;
     padding: 14px 16px;
     resize: both; /* 오른쪽 아래 모서리를 끌어 가로·세로 크기 조절 */
+    scrollbar-color: var(--border-soft) transparent; /* Firefox */
   }
 
   #preview::-webkit-scrollbar { width: 8px; }
   #preview::-webkit-scrollbar-track { background: transparent; }
   #preview::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 4px; }
   #preview::-webkit-scrollbar-thumb:hover { background: var(--gold-deep); }
+
+  /* 크기조절 핸들 — 은은한 대각선 두 줄로 "여기서 조절" 힌트 */
+  #preview::-webkit-resizer,
+  textarea#logInput::-webkit-resizer {
+    background:
+      linear-gradient(135deg,
+        transparent 0 50%, var(--border-soft) 50% 58%,
+        transparent 58% 66%, var(--border-soft) 66% 74%,
+        transparent 74%);
+  }
 
   .empty-notice {
     color: var(--text-secondary);
